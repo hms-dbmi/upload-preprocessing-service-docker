@@ -14,4 +14,7 @@ RUN mkdir /output/
 
 COPY poll_process.py /output/poll_process.py
 
+RUN mkdir ~/.aws/
+COPY config ~/.aws/config
+
 CMD ["python3","/output/poll_process.py","upload-preprocessing"]
