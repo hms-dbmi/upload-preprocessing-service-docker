@@ -5,7 +5,7 @@ import uuid
 import subprocess
 import requests
 import json
-from os import remove
+import os
 
 currentQueue = sys.argv.pop()
 
