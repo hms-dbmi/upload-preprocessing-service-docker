@@ -82,7 +82,8 @@ while True:
 						except:
 							print("Error processing BAM - ", sys.exc_info()[0], flush=True)				
 
-						os.remove(tempBAMReheader)
+						os.remove(tempBAMReheader.name)
+						os.remove(tempBAMHeader.name)
 						os.remove(tempBAMFile)
 				
 						# Let the queue know that the message is processed
