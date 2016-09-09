@@ -35,45 +35,64 @@ while True:
 				
 				#Get the new ID to use instead of the UDN_ID.
 				request_params = {"udn_id" : UDN_ID}
-				r = requests.get('http://ups.aws.dbmi.hms.harvard.edu/id_pair/create_or_retrieve/',params=request_params)
-				external_id = r.json()[0]["external_id"]
 				
-				print("Retrieved external ID.")
-				
-				print("Processing BAM header via samtools.")
-				
-				#Generate ID for downloaded file.
-				tempBAMFile = str(uuid.uuid4())
-				tempBAMHeader = open("/output/header.sam","w+")
-				tempBAMReheader = open("/output/" + str(uuid.uuid4()),"w")
-				
-				replacement_regex = "s/" + UDN_ID + "/" + external_id + "/"
-				
-				#Retrieve the file from S3.
-				retrieveBucket = resource.Bucket(FileBucket)
-				retrieveBucket.download_file(FileKey, tempBAMFile)
+				try:			
+					r = requests.get('http://ups.aws.dbmi.hms.harvard.edu/id_pair/create_or_retrieve/',params=request_params)
+					external_id = r.json()[0]["external_id"]
+				except:
+					print("Error retrieving external ID - ", sys.exc_info()[0])
 
-				#Now we need to swap the ID's via samtools. Do some crazy piping.
-				p1 = subprocess.Popen(["samtools","view","-H",tempBAMFile], stdout=subprocess.PIPE)
+				if(external_id):
+					print("Retrieved external ID.")
+
+					#Generate file IDs and paths.
+					tempBAMFile = str(uuid.uuid4())
+					tempBAMHeader = open("/output/header.sam","w+")
+					tempBAMReheader = open("/output/" + str(uuid.uuid4()),"w")
+					replacement_regex = "s/" + UDN_ID + "/" + external_id + "/"
+					
+					process_bam = True
+					
+					print("Downloading file from S3.")
+					
+					#Retrieve the file from S3.
+					try:
+						retrieveBucket = resource.Bucket(FileBucket)
+						retrieveBucket.download_file(FileKey, tempBAMFile)
+					except:
+						print("Error retrieving file from S3 - ", sys.exc_info()[0])				
+						process_bam = False		
+					
+					if(process_bam):
+					
+						print("Processing BAM with samtools.")
+						
+						try:
+							#Now we need to swap the ID's via samtools. Do some crazy piping.
+							p1 = subprocess.Popen(["samtools","view","-H",tempBAMFile], stdout=subprocess.PIPE)
 				
-				p2 = subprocess.Popen(["sed","-e",replacement_regex], stdin=p1.stdout, stdout=tempBAMHeader)
-				p1.stdout.close()
+							p2 = subprocess.Popen(["sed","-e",replacement_regex], stdin=p1.stdout, stdout=tempBAMHeader)
+							p1.stdout.close()
 				
-				p3 = subprocess.Popen(["samtools","reheader","/output/header.sam",tempBAMFile], stdout=tempBAMReheader)
+							p3 = subprocess.Popen(["samtools","reheader","/output/header.sam",tempBAMFile], stdout=tempBAMReheader)
 				
-				p3.communicate()
+							p3.communicate()
 				
-				print("Done processing file. Begin upload.")
+							print("Done processing file. Begin upload.")
+						except:
+							print("Error processing BAM - ", sys.exc_info()[0])				
+
+						os.remove(tempBAMReheader)
+						os.remove(tempBAMFile)
 				
-				os.remove(tempBAMReheader)
-				os.remove(tempBAMFile)
+						# Let the queue know that the message is processed
+						message.delete()				
 				
 			else:
 				print("Message failed to provide all required attributes.")
 				print(message)
 				
-		# Let the queue know that the message is processed
-		message.delete()
+
 	
 	time.sleep(10)
 	
