@@ -6,38 +6,54 @@ import subprocess
 import requests
 import json
 import os
+import hvac
+import base64
 
+from subprocess import call
+
+#Get the name of the SQS queue from the passed in parameters.
 currentQueue = sys.argv.pop()
 
+#HVAC is vaults python package. Pull the secret key from vault, write it to a file, and base64 decode it.
+client = hvac.Client(url=os.environ['VAULT_ADDRESS'], token=os.environ['ONETIME_TOKEN'], verify=False)
+AsperaKey = client.read('secret/udn/ups/aspera_key')['data']['value']
+aspera_file = open("/aspera/aspera.pk.64","w")
+aspera_file.write(AsperaKey)
+aspera_file.flush()
+aspera_file.close()
+aspera_decoded_file = open("/aspera/aspera.pk","w")
+call(["base64","-d","/aspera/aspera.pk.64"], stdout=aspera_decoded_file)
+
+#Initialize AWS objects.
 resource = boto3.resource('s3')
-
 sqs = boto3.resource('sqs')
-
 queue = sqs.get_queue_by_name(QueueName=currentQueue)
 
 while True:
 	print("Retrieving messages from queue - '" + currentQueue + "'", flush=True)
 	
-	for message in queue.receive_messages(MessageAttributeNames=['UDN_ID','FileBucket','FileKey','DestinationBucket','DestinationKey']):
+	for message in queue.receive_messages(MessageAttributeNames=['UDN_ID','FileBucket','FileKey','DestinationBucket','DestinationKey','AsperaPass']):
 		print("Found Messages, processing.", flush=True)
 
 		if message.message_attributes is not None:
 			UDN_ID = message.message_attributes.get('UDN_ID').get('StringValue')
-			
+
 			FileBucket = message.message_attributes.get('FileBucket').get('StringValue')
 			FileKey = message.message_attributes.get('FileKey').get('StringValue')
 			
 			DestinationBucket = message.message_attributes.get('DestinationBucket').get('StringValue')
 			DestinationKey = message.message_attributes.get('DestinationKey').get('StringValue')
 			
-			if UDN_ID and FileBucket and FileKey and DestinationBucket and DestinationKey:
+			AsperaPass = message.message_attributes.get('AsperaPass').get('StringValue')
+			
+			if UDN_ID and FileBucket and FileKey and DestinationBucket and DestinationKey and AsperaPass:
 				print("Processing UDN_ID - " + UDN_ID + ".", flush=True)
 				
 				#Get the new ID to use instead of the UDN_ID.
 				request_params = {"udn_id" : UDN_ID}
 				
 				try:			
-					r = requests.get('http://ups.aws.dbmi.hms.harvard.edu/id_pair/create_or_retrieve/',params=request_params)
+					r = requests.get('https://idstore.dbmi.hms.harvard.edu/id_pair/create_or_retrieve/',params=request_params)
 					external_id = r.json()[0]["external_id"]
 				except:
 					print("Error retrieving external ID - ", sys.exc_info()[0], flush=True)
@@ -79,8 +95,16 @@ while True:
 							p3.communicate()
 				
 							print("Done processing file. Begin upload.", flush=True)
+														
 						except:
-							print("Error processing BAM - ", sys.exc_info()[0], flush=True)				
+							print("Error processing BAM - ", sys.exc_info()[:2], flush=True)				
+
+						try:
+							os.environ["ASPERA_SCP_FILEPASS"] = AsperaPass
+							call(["/home/aspera/.aspera/connect/bin/ascp", "--file-crypt=encrypt","-v" , "-i /aspera/aspera.pk", tempBAMReheader.name, "subasp@upload.ncbi.nlm.nih.gov:uploads/niIvjSMa/"])
+							
+						except:
+							print("Error sending files via Aspera - ", sys.exc_info()[:2], flush=True)				
 
 						os.remove(tempBAMReheader.name)
 						os.remove(tempBAMHeader.name)
@@ -92,8 +116,6 @@ while True:
 			else:
 				print("Message failed to provide all required attributes.", flush=True)
 				print(message)
-				
-
 	
 	time.sleep(10)
 	
