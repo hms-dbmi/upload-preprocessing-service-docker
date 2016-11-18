@@ -1,0 +1,12 @@
+{
+    "family": "UPS-DEV",
+    "containerDefinitions": [
+        {
+            "name": "upload-preprocessing-service",
+            "image": "dbmi/upload-preprocessing-service-docker:development",
+            "cpu": 1,
+            "memory": 200,
+            "memoryReservation": 200						
+        }
+    ]
+}
