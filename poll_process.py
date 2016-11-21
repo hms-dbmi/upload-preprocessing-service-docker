@@ -52,8 +52,8 @@ while True:
 
                 # Generate file IDs and paths.
                 tempBAMFile = str(uuid.uuid4())
-                tempBAMHeader = open("/aspera/header.sam", "w+")
-                tempBAMReheader = open("/aspera/" + str(uuid.uuid4()), "w")
+                tempBAMHeader = open("/scratch/header.sam", "w+")
+                tempBAMReheader = open("/scratch/" + str(uuid.uuid4()), "w")
                 replacement_regex = "s/" + UDN_ID + "/" + Sample_ID + "/"
 
                 process_bam = True
@@ -79,7 +79,7 @@ while True:
                         p2 = subprocess.Popen(["sed", "-e", replacement_regex], stdin=p1.stdout, stdout=tempBAMHeader)
                         p1.stdout.close()
 
-                        p3 = subprocess.Popen(["samtools", "reheader", "/aspera/header.sam", tempBAMFile], stdout=tempBAMReheader)
+                        p3 = subprocess.Popen(["samtools", "reheader", "/scratch/header.sam", tempBAMFile], stdout=tempBAMReheader)
 
                         p3.communicate()
 
