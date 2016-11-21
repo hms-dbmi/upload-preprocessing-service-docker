@@ -36,7 +36,7 @@ queue = sqs.get_queue_by_name(QueueName=currentQueue)
 while True:
     print("Retrieving messages from queue - '" + currentQueue + "'", flush=True)
 
-    for message in queue.receive_messages(MessageAttributeNames=['UDN_ID', 'FileBucket', 'FileKey', 'DestinationBucket', 'DestinationKey']):
+    for message in queue.receive_messages(MessageAttributeNames=['UDN_ID', 'FileBucket', 'FileKey', 'sample_ID']):
         print("Found Messages, processing.", flush=True)
 
         if message.message_attributes is not None:
@@ -45,79 +45,63 @@ while True:
             FileBucket = message.message_attributes.get('FileBucket').get('StringValue')
             FileKey = message.message_attributes.get('FileKey').get('StringValue')
 
-            DestinationBucket = message.message_attributes.get('DestinationBucket').get('StringValue')
-            DestinationKey = message.message_attributes.get('DestinationKey').get('StringValue')
+            Sample_ID = message.message_attributes.get('sample_ID').get('StringValue')
 
-            if UDN_ID and FileBucket and FileKey and DestinationBucket and DestinationKey:
+            if UDN_ID and FileBucket and FileKey and Sample_ID:
                 print("Processing UDN_ID - " + UDN_ID + ".", flush=True)
-                swap_ids = True
 
-                # Get the new ID to use instead of the UDN_ID.
-                request_params = {"udn_id": UDN_ID}
+                # Generate file IDs and paths.
+                tempBAMFile = str(uuid.uuid4())
+                tempBAMHeader = open("/scratch/header.sam", "w+")
+                tempBAMReheader = open("/scratch/" + str(uuid.uuid4()), "w")
+                replacement_regex = "s/" + UDN_ID + "/" + Sample_ID + "/"
 
+                process_bam = True
+
+                print("Downloading file from S3.", flush=True)
+
+                # Retrieve the file from S3.
                 try:
-                    # r = requests.get(IDSTORE_URL, params=request_params)
-                    # external_id = r.json()[0]["external_id"]
-                    external_id = "1243"
+                    retrieveBucket = resource.Bucket(FileBucket)
+                    retrieveBucket.download_file(FileKey, tempBAMFile)
                 except:
-                    print("Error retrieving external ID - ", sys.exc_info()[0], flush=True)
-                    swap_ids = False
+                    print("Error retrieving file from S3 - ", sys.exc_info()[0], flush=True)
+                    process_bam = False
 
-                if swap_ids and external_id:
-                    print("Retrieved external ID.", flush=True)
+                if process_bam:
 
-                    # Generate file IDs and paths.
-                    tempBAMFile = str(uuid.uuid4())
-                    tempBAMHeader = open("/output/header.sam", "w+")
-                    tempBAMReheader = open("/output/" + str(uuid.uuid4()), "w")
-                    replacement_regex = "s/" + UDN_ID + "/" + external_id + "/"
+                    print("Processing BAM with samtools.", flush=True)
 
-                    process_bam = True
-
-                    print("Downloading file from S3.", flush=True)
-
-                    # Retrieve the file from S3.
                     try:
-                        retrieveBucket = resource.Bucket(FileBucket)
-                        retrieveBucket.download_file(FileKey, tempBAMFile)
+                        # Now we need to swap the ID's via samtools. Do some crazy piping.
+                        p1 = subprocess.Popen(["samtools", "view", "-H", tempBAMFile], stdout=subprocess.PIPE)
+
+                        p2 = subprocess.Popen(["sed", "-e", replacement_regex], stdin=p1.stdout, stdout=tempBAMHeader)
+                        p1.stdout.close()
+
+                        p3 = subprocess.Popen(["samtools", "reheader", "/scratch/header.sam", tempBAMFile], stdout=tempBAMReheader)
+
+                        p3.communicate()
+
+                        print("Done processing file. Begin upload.", flush=True)
+
                     except:
-                        print("Error retrieving file from S3 - ", sys.exc_info()[0], flush=True)
-                        process_bam = False
+                        print("Error processing BAM - ", sys.exc_info()[:2], flush=True)
 
-                    if process_bam:
+                    try:
 
-                        print("Processing BAM with samtools.", flush=True)
+                        print("Attempting to upload file via Aspera - asp-sra@gap-submit.ncbi.nlm.nih.gov" + LOCATION_CODE)
+                        call(["/home/aspera/.aspera/connect/bin/ascp -i /aspera/aspera.pk -Q -l 200m -k 1 " + tempBAMReheader.name + " asp-sra@gap-submit.ncbi.nlm.nih.gov:" + LOCATION_CODE], shell=True)
 
-                        try:
-                            # Now we need to swap the ID's via samtools. Do some crazy piping.
-                            p1 = subprocess.Popen(["samtools", "view", "-H", tempBAMFile], stdout=subprocess.PIPE)
+                    except:
+                        print("Error sending files via Aspera - ", sys.exc_info()[:2], flush=True)
 
-                            p2 = subprocess.Popen(["sed", "-e", replacement_regex], stdin=p1.stdout, stdout=tempBAMHeader)
-                            p1.stdout.close()
+                    os.remove(tempBAMReheader.name)
+                    os.remove(tempBAMHeader.name)
+                    os.remove(tempBAMFile)
 
-                            p3 = subprocess.Popen(["samtools", "reheader", "/output/header.sam", tempBAMFile], stdout=tempBAMReheader)
-
-                            p3.communicate()
-
-                            print("Done processing file. Begin upload.", flush=True)
-
-                        except:
-                            print("Error processing BAM - ", sys.exc_info()[:2], flush=True)
-
-                        try:
-
-                            print("Attempting to upload file via Aspera - asp-sra@gap-submit.ncbi.nlm.nih.gov" + LOCATION_CODE)
-                            call(["/home/aspera/.aspera/connect/bin/ascp -i /aspera/aspera.pk -Q -l 200m -k 1 " + tempBAMReheader.name + " asp-sra@gap-submit.ncbi.nlm.nih.gov:" + LOCATION_CODE], shell=True)
-
-                        except:
-                            print("Error sending files via Aspera - ", sys.exc_info()[:2], flush=True)
-
-                        os.remove(tempBAMReheader.name)
-                        os.remove(tempBAMHeader.name)
-                        os.remove(tempBAMFile)
-
-                        # Let the queue know that the message is processed
-                        message.delete()
+                    # Let the queue know that the message is processed
+                    message.delete()
 
             else:
                 print("Message failed to provide all required attributes.", flush=True)
