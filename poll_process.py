@@ -7,7 +7,7 @@ import requests
 import json
 import os
 import hvac
-
+import botocore
 
 from subprocess import call
 
@@ -64,8 +64,8 @@ while True:
                 try:
                     retrieveBucket = resource.Bucket(FileBucket)
                     retrieveBucket.download_file(FileKey, tempBAMFile)
-                except:
-                    print("Error retrieving file from S3 - ", sys.exc_info()[0], flush=True)
+                except botocore.exceptions.ClientError as e:
+                    print("Error retrieving file from S3 - %s" % e, flush=True)
                     process_bam = False
 
                 if process_bam:
