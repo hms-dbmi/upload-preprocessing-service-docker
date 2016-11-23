@@ -3,13 +3,20 @@ import sys
 import time
 import uuid
 import subprocess
-import requests
-import json
 import os
 import hvac
 import botocore
-
+import errno
 from subprocess import call
+
+
+def silentremove(filename):
+    try:
+        os.remove(filename)
+    except OSError as e:
+        if e.errno != errno.ENOENT:
+            raise
+
 
 # Get the name of the SQS queue from the passed in parameters.
 currentQueue = os.environ["QUEUE_NAME"]
@@ -58,7 +65,7 @@ while True:
                     retrieveBucket = resource.Bucket(FileBucket)
                     retrieveBucket.download_file(FileKey, tempBAMFile)
                 except botocore.exceptions.ClientError as e:
-                    os.remove(tempBAMFile)
+                    silentremove(tempBAMFile)
                     print("Error retrieving file from S3 - %s" % e, flush=True)
                     process_bam = False
 
@@ -85,9 +92,9 @@ while True:
 
                     except:
                         print("Error processing BAM - ", sys.exc_info()[:2], flush=True)
-                        os.remove(tempBAMReheader.name)
-                        os.remove(tempBAMHeader.name)
-                        os.remove(tempBAMFile)
+                        silentremove(tempBAMReheader.name)
+                        silentremove(tempBAMHeader.name)
+                        silentremove(tempBAMFile)
 
                     try:
 
@@ -96,13 +103,13 @@ while True:
 
                     except:
                         print("Error sending files via Aspera - ", sys.exc_info()[:2], flush=True)
-                        os.remove(tempBAMReheader.name)
-                        os.remove(tempBAMHeader.name)
-                        os.remove(tempBAMFile)
+                        silentremove(tempBAMReheader.name)
+                        silentremove(tempBAMHeader.name)
+                        silentremove(tempBAMFile)
 
-                    os.remove(tempBAMReheader.name)
-                    os.remove(tempBAMHeader.name)
-                    os.remove(tempBAMFile)
+                    silentremove(tempBAMReheader.name)
+                    silentremove(tempBAMHeader.name)
+                    silentremove(tempBAMFile)
 
                     # Let the queue know that the message is processed
                     message.delete()
