@@ -50,27 +50,25 @@ while True:
             if UDN_ID and FileBucket and FileKey and Sample_ID:
                 print("Processing UDN_ID - " + UDN_ID + ".", flush=True)
 
-                # Generate file IDs and paths.
-                tempBAMFile = str(uuid.uuid4())
-                tempBAMHeader = open("/scratch/header.sam", "w+")
-                tempBAMReheader = open("/scratch/" + str(uuid.uuid4()), "w")
-                replacement_regex = "s/" + UDN_ID + "/" + Sample_ID + "/"
-
-                process_bam = True
-
                 print("Downloading file from S3.", flush=True)
 
                 # Retrieve the file from S3.
                 try:
+                    tempBAMFile = str(uuid.uuid4())
                     retrieveBucket = resource.Bucket(FileBucket)
                     retrieveBucket.download_file(FileKey, tempBAMFile)
                 except botocore.exceptions.ClientError as e:
+                    os.remove(tempBAMFile)
                     print("Error retrieving file from S3 - %s" % e, flush=True)
                     process_bam = False
 
                 if process_bam:
 
                     print("Processing BAM with samtools.", flush=True)
+
+                    tempBAMHeader = open("/scratch/header.sam", "w+")
+                    tempBAMReheader = open("/scratch/" + str(uuid.uuid4()), "w")
+                    replacement_regex = "s/" + UDN_ID + "/" + Sample_ID + "/"
 
                     try:
                         # Now we need to swap the ID's via samtools. Do some crazy piping.
@@ -87,6 +85,9 @@ while True:
 
                     except:
                         print("Error processing BAM - ", sys.exc_info()[:2], flush=True)
+                        os.remove(tempBAMReheader.name)
+                        os.remove(tempBAMHeader.name)
+                        os.remove(tempBAMFile)
 
                     try:
 
@@ -95,6 +96,9 @@ while True:
 
                     except:
                         print("Error sending files via Aspera - ", sys.exc_info()[:2], flush=True)
+                        os.remove(tempBAMReheader.name)
+                        os.remove(tempBAMHeader.name)
+                        os.remove(tempBAMFile)
 
                     os.remove(tempBAMReheader.name)
                     os.remove(tempBAMHeader.name)
