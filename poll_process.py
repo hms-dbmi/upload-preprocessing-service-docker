@@ -56,12 +56,11 @@ while True:
 
             if UDN_ID and FileBucket and FileKey and Sample_ID:
                 print("Processing UDN_ID - " + UDN_ID + ".", flush=True)
-
                 print("Downloading file from S3.", flush=True)
 
                 # Retrieve the file from S3.
                 try:
-                    tempBAMFile = str(uuid.uuid4())
+                    tempBAMFile = "/scratch/" + str(uuid.uuid4())
                     retrieveBucket = resource.Bucket(FileBucket)
                     retrieveBucket.download_file(FileKey, tempBAMFile)
                 except botocore.exceptions.ClientError as e:
