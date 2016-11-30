@@ -11,7 +11,8 @@ RUN tar -xvzf /aspera/aspera-connect-3.6.2.117442-linux-64.tar.gz -C /aspera/
 RUN useradd -m aspera
 RUN usermod -L aspera
 RUN runuser -l aspera -c '/aspera/aspera-connect-3.6.2.117442-linux-64.sh'
-RUN ls -l /home/aspera/
+
+COPY asperaweb_id_dsa.openssh /aspera/asperaweb_id_dsa.openssh
 
 RUN python3 -m pip install boto3
 RUN python3 -m pip install requests
