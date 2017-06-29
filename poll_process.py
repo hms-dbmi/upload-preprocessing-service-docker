@@ -59,7 +59,7 @@ queue = sqs.get_queue_by_name(QueueName=currentQueue)
 # --------------------
 
 # --------------------
-def process_vcf(UDN_ID, FileBucket, FileKey, Sample_ID, upload_file_name, file_type):
+def process_vcf(UDN_ID, sequence_core_alias, FileBucket, FileKey, Sample_ID, upload_file_name, file_type):
 
     return_continue_and_delete = True
 
@@ -74,7 +74,9 @@ def process_vcf(UDN_ID, FileBucket, FileKey, Sample_ID, upload_file_name, file_t
     except OSError:
         pass
 
-    call(["sed -i -e 's/" + UDN_ID + "/" + Sample_ID + "/gw /scratch/changelog.txt'  /scratch/" + upload_file_name], shell=True)
+    empty_string = ''
+    call(["sed -i -e 's/" + sequence_core_alias + "/" + Sample_ID + "/gw /scratch/changelog.txt'  /scratch/" + upload_file_name], shell=True)
+    call(["sed -i -e 's/" + UDN_ID + "/" + empty_string + "/gw /scratch/changelog.txt'  /scratch/" + upload_file_name], shell=True)
 
     change_log_file_size = 0
 
@@ -98,7 +100,7 @@ def process_vcf(UDN_ID, FileBucket, FileKey, Sample_ID, upload_file_name, file_t
     return return_continue_and_delete
 
 
-def process_bam(UDN_ID, FileBucket, FileKey, Sample_ID, upload_file_name, file_type, md5):
+def process_bam(UDN_ID, sequence_core_alias, FileBucket, FileKey, Sample_ID, upload_file_name, file_type, md5):
 
     return_continue_and_delete = True
 
@@ -114,7 +116,8 @@ def process_bam(UDN_ID, FileBucket, FileKey, Sample_ID, upload_file_name, file_t
     if change_log_file_size == 0:
         print("[DEBUG] Error swapping identifiers in file. Changelog file is empty. {}|{}|{}|{}|{}|{}".format(UDN_ID, FileBucket, FileKey, Sample_ID, upload_file_name, file_type), flush=True)
 
-    subprocess.call(["/output/bam_rehead.sh", tempFile, UDN_ID, Sample_ID])
+    subprocess.call(["/output/bam_rehead.sh", tempFile, sequence_core_alias, Sample_ID])
+    subprocess.call(["/output/bam_rehead.sh", tempFile, UDN_ID, ''])
     os.rename("/scratch/md5_reheader", "/scratch/" + upload_file_name)
 
     print("[DEBUG] Done processing file. Verify MD5 if present.", flush=True)
@@ -147,6 +150,7 @@ while True:
 
         if message.message_attributes is not None:
             UDN_ID = message.message_attributes.get('UDN_ID').get('StringValue')
+            sequence_core_alias = message.message_attributes.get('sequence_core_alias').get('StringValue')
 
             FileBucket = message.message_attributes.get('FileBucket').get('StringValue')
             FileKey = message.message_attributes.get('FileKey').get('StringValue')
@@ -158,7 +162,7 @@ while True:
 
             md5 = message.message_attributes.get('md5').get('StringValue')
 
-            if UDN_ID and FileBucket and FileKey and Sample_ID and upload_file_name and file_type:
+            if UDN_ID and sequence_core_alias and FileBucket and FileKey and Sample_ID and upload_file_name and file_type:
                 print("[DEBUG] Processing UDN_ID - " + UDN_ID + ".", flush=True)
                 print("[DEBUG] Downloading file. Bucket - " + FileBucket + " key - " + FileKey, flush=True)
 
@@ -179,7 +183,7 @@ while True:
                     print("[DEBUG] Processing BAM with samtools.", flush=True)
 
                     try:
-                        continue_and_delete = process_bam(UDN_ID, FileBucket, FileKey, Sample_ID, upload_file_name, file_type, md5)
+                        continue_and_delete = process_bam(UDN_ID, sequence_core_alias, FileBucket, FileKey, Sample_ID, upload_file_name, file_type, md5)
                     except:
                         print("Error processing BAM - ", sys.exc_info()[:2], flush=True)
                         continue_and_delete = False
@@ -191,7 +195,7 @@ while True:
 
                 elif file_type == "VCF" and continue_and_delete:
                     try:
-                        continue_and_delete = process_vcf(UDN_ID, FileBucket, FileKey, Sample_ID, upload_file_name, file_type)
+                        continue_and_delete = process_vcf(UDN_ID, sequence_core_alias, FileBucket, FileKey, Sample_ID, upload_file_name, file_type)
                     except:
                         print("[ERROR] Error processing VCF - ", sys.exc_info()[:2], flush=True)
                         continue_and_delete = False
