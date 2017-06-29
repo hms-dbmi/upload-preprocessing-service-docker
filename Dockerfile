@@ -11,10 +11,10 @@ RUN tar -xvzf /aspera/aspera-connect-3.6.2.117442-linux-64.tar.gz -C /aspera/
 RUN useradd -m aspera
 RUN usermod -L aspera
 RUN runuser -l aspera -c '/aspera/aspera-connect-3.6.2.117442-linux-64.sh'
-RUN ls -l /home/aspera/
 
 RUN python3 -m pip install boto3
 RUN python3 -m pip install requests
+RUN python3 -m pip install hvac
 RUN python3 -m pip install hvac
 ADD samtools-1.3.1.tar.bz2 samtools.tar.bz2
 RUN cd samtools.tar.bz2 && cd samtools-1.3.1 && make
@@ -23,9 +23,15 @@ ENV AWS_CONFIG_FILE /.aws/config
 
 RUN mkdir /output/
 
-COPY poll_process.py /output/poll_process.py
-
 RUN mkdir /.aws/
 COPY config /.aws/config
+
+COPY bam_rehead.sh /output/bam_rehead.sh
+RUN chmod 700 /output/bam_rehead.sh
+
+COPY bam_extract_header.sh /output/bam_extract_header.sh
+RUN chmod 700 /output/bam_extract_header.sh
+
+COPY poll_process.py /output/poll_process.py
 
 CMD ["python3","/output/poll_process.py"]
