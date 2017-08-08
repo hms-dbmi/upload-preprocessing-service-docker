@@ -143,7 +143,7 @@ while True:
 
     print("Retrieving messages from queue - '" + currentQueue + "'", flush=True)
 
-    for message in queue.receive_messages(MaxNumberOfMessages=1, MessageAttributeNames=['UDN_ID', 'FileBucket', 'FileKey', 'sample_ID', 'file_service_uuid', 'file_type', 'md5']):
+    for message in queue.receive_messages(MaxNumberOfMessages=1, MessageAttributeNames=['UDN_ID', 'FileBucket', 'FileKey', 'sample_ID', 'file_service_uuid', 'file_type', 'md5', 'sequence_core_alias']):
         print("Found Messages, processing.", flush=True)
 
         continue_and_delete = True
@@ -151,15 +151,11 @@ while True:
         if message.message_attributes is not None:
             UDN_ID = message.message_attributes.get('UDN_ID').get('StringValue')
             sequence_core_alias = message.message_attributes.get('sequence_core_alias').get('StringValue')
-
             FileBucket = message.message_attributes.get('FileBucket').get('StringValue')
             FileKey = message.message_attributes.get('FileKey').get('StringValue')
-
             Sample_ID = message.message_attributes.get('sample_ID').get('StringValue')
             upload_file_name = message.message_attributes.get('file_service_uuid').get('StringValue')
-
             file_type = message.message_attributes.get('file_type').get('StringValue')
-
             md5 = message.message_attributes.get('md5').get('StringValue')
 
             if UDN_ID and sequence_core_alias and FileBucket and FileKey and Sample_ID and upload_file_name and file_type:
@@ -179,6 +175,7 @@ while True:
                     continue
 
                 if file_type == "BAM" and continue_and_delete:
+                    
 
                     print("[DEBUG] Processing BAM with samtools.", flush=True)
 
