@@ -160,8 +160,6 @@ while True:
 
             file_type = message.message_attributes.get('file_type').get('StringValue')
 
-            md5 = message.message_attributes.get('md5').get('StringValue')
-
             if UDN_ID and sequence_core_alias and FileBucket and FileKey and Sample_ID and upload_file_name and file_type:
                 print("[DEBUG] Processing UDN_ID - " + UDN_ID + ".", flush=True)
                 print("[DEBUG] Downloading file. Bucket - " + FileBucket + " key - " + FileKey, flush=True)
@@ -179,6 +177,8 @@ while True:
                     continue
 
                 if file_type == "BAM" and continue_and_delete:
+                    
+                    md5 = message.message_attributes.get('md5').get('StringValue')
 
                     print("[DEBUG] Processing BAM with samtools.", flush=True)
 
