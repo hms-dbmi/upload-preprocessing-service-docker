@@ -277,7 +277,7 @@ def process_bam(UDN_ID, sequence_core_alias, FileBucket, FileKey, Sample_ID, upl
 
 
     subprocess.call(["/output/bam_rehead.sh", tempFile])
-    os.rename("/scratch/md5_reheader", "/scratch/" + upload_file_name + '.bam')
+    os.rename("/scratch/md5_reheader", "/scratch/" + upload_file_name)
 
     print("[DEBUG] Done processing file. Verify MD5 if present.", flush=True)
 
@@ -315,9 +315,15 @@ while True:
             FileBucket = message.message_attributes.get('FileBucket').get('StringValue')
             FileKey = message.message_attributes.get('FileKey').get('StringValue')
             Sample_ID = message.message_attributes.get('sample_ID').get('StringValue')
-            upload_file_name = message.message_attributes.get('file_service_uuid').get('StringValue')
             file_type = message.message_attributes.get('file_type').get('StringValue')
             md5 = message.message_attributes.get('md5').get('StringValue')
+
+            if file_type == 'BAM':
+                filename_extension = '.bam'
+            elif file_type = 'VCF':
+                filename_extension = '.vcf'
+
+            upload_file_name = "%s%s" % (message.message_attributes.get('file_service_uuid').get('StringValue'), filename_extension)
 
             if UDN_ID and sequence_core_alias and FileBucket and FileKey and Sample_ID and upload_file_name and file_type:
                 print("[DEBUG] Processing UDN_ID - " + UDN_ID + ".", flush=True)
