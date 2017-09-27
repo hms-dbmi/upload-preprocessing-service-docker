@@ -96,6 +96,8 @@ def update_and_ship_XML(upload_file_name, md5):
     updates the run.xml file to include the MD5
     """
     
+    file_key = upload_file_name.split('.')[0]
+
     # Retrieve the file from S3.
     try:
         temp_run_file = "/scratch/run.xml"
@@ -105,9 +107,9 @@ def update_and_ship_XML(upload_file_name, md5):
         # swap this out later 
         retrieveBucket = s3.Bucket('udn-prod-dbgap')
 
-        run_file = 'xml/'+upload_file_name+'/'+upload_file_name+'-run.xml'
-        exp_file = 'xml/'+upload_file_name+'/'+upload_file_name+'-experiment.xml'
-        sub_file = 'xml/'+upload_file_name+'/'+upload_file_name+'-submission.xml'
+        run_file = 'xml/'+file_key+'/'+file_key+'-run.xml'
+        exp_file = 'xml/'+file_key+'/'+file_key+'-experiment.xml'
+        sub_file = 'xml/'+file_key+'/'+file_key+'-submission.xml'
         
         retrieveBucket.download_file(run_file, temp_run_file)
         retrieveBucket.download_file(exp_file, temp_experiment_file)
@@ -320,7 +322,7 @@ while True:
 
             if file_type == 'BAM':
                 filename_extension = '.bam'
-            elif file_type = 'VCF':
+            elif file_type == 'VCF':
                 filename_extension = '.vcf'
 
             upload_file_name = "%s%s" % (message.message_attributes.get('file_service_uuid').get('StringValue'), filename_extension)
