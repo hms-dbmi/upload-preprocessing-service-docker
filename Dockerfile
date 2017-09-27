@@ -4,6 +4,7 @@ RUN apt-get update && apt-get install -y gcc make bzip2 zlib1g-dev ncurses-dev
 RUN apt-get update && apt-get install -y python3
 RUN apt-get update && apt-get install -y python3-pip
 RUN apt-get update && apt-get install -y wget
+RUN apt-get update && apt-get install -y libxml2-utils
 
 RUN mkdir /aspera/
 RUN wget http://download.asperasoft.com/download/sw/connect/3.6.2/aspera-connect-3.6.2.117442-linux-64.tar.gz -P /aspera/

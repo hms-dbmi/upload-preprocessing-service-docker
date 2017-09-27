@@ -8,6 +8,9 @@ import botocore
 import errno
 from subprocess import call, check_output
 import time
+import xml.etree.ElementTree as ET
+import codecs
+import tarfile
 
 def silentremove(filename):
     try:
@@ -51,7 +54,7 @@ aspera_vcf_key_file.close()
 os.environ["ASPERA_SCP_FILEPASS"] = ASPERA_PASS
 
 # Initialize AWS objects.
-resource = boto3.resource('s3')
+s3 = boto3.resource('s3')
 sqs = boto3.resource('sqs')
 queue = sqs.get_queue_by_name(QueueName=currentQueue)
 
@@ -59,6 +62,121 @@ queue = sqs.get_queue_by_name(QueueName=currentQueue)
 # --------------------
 
 # --------------------
+
+def xmlIndent(elem, level=0):
+    """
+    sets proper indent on xml
+    """
+    i = "\n" + level*"  "
+    if len(elem):
+        if not elem.text or not elem.text.strip():
+            elem.text = i + "  "
+        if not elem.tail or not elem.tail.strip():
+            elem.tail = i
+        for elem in elem:
+            xmlIndent(elem, level+1)
+        if not elem.tail or not elem.tail.strip():
+            elem.tail = i
+    else:
+        if level and (not elem.tail or not elem.tail.strip()):
+            elem.tail = i
+
+
+def xmlToString(xml):
+    """
+    properly formats XML as String
+    """
+    elem = xml.getroot()
+    xmlIndent(elem)
+    return ET.tostring(elem, encoding="utf-8")
+
+
+def update_and_ship_XML(upload_file_name, md5):
+    """
+    updates the run.xml file to include the MD5
+    """
+    
+    # Retrieve the file from S3.
+    try:
+        temp_run_file = "/scratch/run.xml"
+        temp_experiment_file = '/scratch/experiment.xml'
+        temp_submission_file = '/scratch/submission.xml'
+        
+        # swap this out later 
+        retrieveBucket = s3.Bucket('udn-prod-dbgap')
+
+        run_file = 'xml/'+upload_file_name+'/'+upload_file_name+'-run.xml'
+        exp_file = 'xml/'+upload_file_name+'/'+upload_file_name+'-experiment.xml'
+        sub_file = 'xml/'+upload_file_name+'/'+upload_file_name+'-submission.xml'
+        
+        retrieveBucket.download_file(run_file, temp_run_file)
+        retrieveBucket.download_file(exp_file, temp_experiment_file)
+        retrieveBucket.download_file(sub_file, temp_submission_file)
+
+    except botocore.exceptions.ClientError as e:
+        silentremove(temp_run_file)
+        silentremove(temp_experiment_file)
+        silentremove(temp_submission_file)
+
+        print("[ERROR] Error retrieving XML file from S3 - %s" % e, flush=True)
+        continue_and_delete = False
+        message.change_visibility(VisibilityTimeout=0)
+        return False
+
+    rum_xml_tree = ET.parse(temp_run_file)
+    root = rum_xml_tree.getroot()
+    run_element = root.find('RUN')
+    data_element = run_element.find('DATA_BLOCK')
+    files_element = data_element.find('FILES')
+
+    xml_file = ET.SubElement(files_element, "FILE")
+    xml_file.set("checksum", md5)
+    xml_file.set("checksum_method", "MD5")
+    xml_file.set("filename", upload_file_name)
+    xml_file.set("filetype", 'bam')
+
+    run_xml = xmlToString(ET.ElementTree(root))
+
+    run_file_handle = codecs.open(temp_run_file, "w", "utf-8")
+    run_file_handle.write(codecs.decode(run_xml, "utf-8"))
+    run_file_handle.close()
+
+    sub_result = call('xmllint --schema http://www.ncbi.nlm.nih.gov/viewvc/v1/trunk/sra/doc/SRA/SRA.submission.xsd?view=co /scratch/submission.xml > /dev/null', shell=True)
+    exp_result = call('xmllint --schema http://www.ncbi.nlm.nih.gov/viewvc/v1/trunk/sra/doc/SRA/SRA.experiment.xsd?view=co /scratch/experiment.xml > /dev/null', shell=True)
+    run_result = call('xmllint --schema http://www.ncbi.nlm.nih.gov/viewvc/v1/trunk/sra/doc/SRA/SRA.run.xsd?view=co /scratch/run.xml > /dev/null', shell=True)
+
+    if sub_result or exp_result or run_result == 0:
+        print("[DEBUG] Successful validation of XML files for {}".format(upload_file_name), flush=True) 
+    else:
+        print("[DEBUG] ERROR - Failed validation of XML files for {} - sub_result ==> {}; exp_result ==> {}; run_result ==> {} ".format(upload_file_name, sub_result, exp_result, run_result), flush=True) 
+        return False
+
+    tar_file_name = '/scratch/'+upload_file_name+'.tar'
+    tar = tarfile.open(tar_file_name, "w")
+    for name in ['/scratch/submission.xml', '/scratch/experiment.xml', '/scratch/run.xml']:
+        print("[DEBUG] Adding "+name+" to tar file")
+        try:
+            tar.add(name)
+        except: 
+            print("[DEBUG] Error adding " + name + " to tar file")
+    tar.close()
+
+    try:
+        print("[DEBUG] Attempting to upload file " + tar_file_name + " via Aspera - asp-hms-cc@gap-submit.ncbi.nlm.nih.gov:" + LOCATION_CODE,flush=True)
+        upload_output = check_output(["/home/aspera/.aspera/connect/bin/ascp -i /aspera/aspera.pk -Q -l 5000m -k 1 " + tar_file_name + " asp-hms-cc@gap-submit.ncbi.nlm.nih.gov:" + LOCATION_CODE],shell=True)
+        print(upload_output, flush=True)
+    except:
+        print("[ERROR] Error sending files via Aspera - ", sys.exc_info()[:2], flush=True)
+        message.change_visibility(VisibilityTimeout=0)
+
+    silentremove(tar_file_name)
+    silentremove(temp_run_file)
+    silentremove(temp_submission_file)
+    silentremove(temp_experiment_file)
+
+    return True
+
+
 def process_vcf(UDN_ID, sequence_core_alias, FileBucket, FileKey, Sample_ID, upload_file_name, file_type):
 
     return_continue_and_delete = True
@@ -132,7 +250,8 @@ def process_bam(UDN_ID, sequence_core_alias, FileBucket, FileKey, Sample_ID, upl
 
     return_continue_and_delete = True
 
-    subprocess.call(["/output/bam_extract_header.sh", tempFile, UDN_ID, Sample_ID])
+    # add extra checks here for other alias
+    subprocess.call(["/output/bam_extract_header.sh", tempFile, sequence_core_alias, Sample_ID])
 
     change_log_file_size = 0
 
@@ -144,26 +263,40 @@ def process_bam(UDN_ID, sequence_core_alias, FileBucket, FileKey, Sample_ID, upl
     if change_log_file_size == 0:
         print("[DEBUG] Error swapping identifiers in file. Changelog file is empty. {}|{}|{}|{}|{}|{}".format(UDN_ID, FileBucket, FileKey, Sample_ID, upload_file_name, file_type), flush=True)
 
-    subprocess.call(["/output/bam_rehead.sh", tempFile, sequence_core_alias, Sample_ID])
-    subprocess.call(["/output/bam_rehead.sh", tempFile, UDN_ID, ''])
-    os.rename("/scratch/md5_reheader", "/scratch/" + upload_file_name)
+        seq_alias_prefix = sequence_core_alias.split('-')[0]
+        subprocess.call(["/output/bam_extract_header.sh", tempFile, seq_alias_prefix, Sample_ID])
+
+        try:
+            change_log_file_size = os.path.getsize('/scratch/changelog.txt')
+        except OSError:
+            print("[DEBUG] Error swapping identifiers in file. Changelog file not found after sed. {}|{}|{}|{}|{}|{}".format(UDN_ID, FileBucket, FileKey, Sample_ID, upload_file_name, file_type), flush=True)
+
+        if change_log_file_size == 0:
+            print("[DEBUG] Error swapping alias prefix in file. Not sending file. Changelog file is empty {} | {} | {}".format(upload_file_name, UDN_ID, sequence_core_alias))
+            return False
+
+
+    subprocess.call(["/output/bam_rehead.sh", tempFile])
+    os.rename("/scratch/md5_reheader", "/scratch/" + upload_file_name + '.bam')
 
     print("[DEBUG] Done processing file. Verify MD5 if present.", flush=True)
 
-    md5_calculated = hashlib.md5(open("/scratch/" + upload_file_name, 'rb').read()).hexdigest()
+    md5 = hashlib.md5(open("/scratch/" + upload_file_name, 'rb').read()).hexdigest()    
 
-    if md5_calculated == md5:
+    # update the run.xml, archive all xml and send
+    xml_success = update_and_ship_XML(upload_file_name, md5)
+    if not xml_success:
+        return False
 
-        try:
-            print("[DEBUG] Attempting to upload file " + upload_file_name + " via Aspera - asp-sra@gap-submit.ncbi.nlm.nih.gov:" + LOCATION_CODE,flush=True)
-            upload_output = check_output(["/home/aspera/.aspera/connect/bin/ascp -i /aspera/aspera.pk -Q -l 5000m -k 1 /scratch/" + upload_file_name + " asp-sra@gap-submit.ncbi.nlm.nih.gov:" + LOCATION_CODE],shell=True)
-            print(upload_output, flush=True)
-        except:
-            print("[ERROR] Error sending files via Aspera - ", sys.exc_info()[:2], flush=True)
-            message.change_visibility(VisibilityTimeout=0)
-            return_continue_and_delete = False
-    else:
-        print("[ERROR] Calculated MD5 does not match existing MD5, {}|{}|{}|{}|{}|{}|{}|{}".format(UDN_ID, FileBucket, FileKey, Sample_ID, upload_file_name, file_type, md5_calculated,md5), flush=True)
+    # then ship the BAM file
+    try:
+        print("[DEBUG] Attempting to upload file " + upload_file_name + " via Aspera - asp-hms-cc@gap-submit.ncbi.nlm.nih.gov:" + LOCATION_CODE,flush=True)
+        upload_output = check_output(["/home/aspera/.aspera/connect/bin/ascp -i /aspera/aspera.pk -Q -l 5000m -k 1 /scratch/" + upload_file_name + " asp-hms-cc@gap-submit.ncbi.nlm.nih.gov:" + LOCATION_CODE],shell=True)
+        print(upload_output, flush=True)
+    except:
+        print("[ERROR] Error sending files via Aspera - ", sys.exc_info()[:2], flush=True)
+        message.change_visibility(VisibilityTimeout=0)
+        return_continue_and_delete = False
 
     return return_continue_and_delete
 
@@ -193,7 +326,7 @@ while True:
                 # Retrieve the file from S3.
                 try:
                     tempFile = "/scratch/md5"
-                    retrieveBucket = resource.Bucket(FileBucket)
+                    retrieveBucket = s3.Bucket(FileBucket)
                     retrieveBucket.download_file(FileKey, tempFile)
                 except botocore.exceptions.ClientError as e:
                     silentremove(tempFile)
