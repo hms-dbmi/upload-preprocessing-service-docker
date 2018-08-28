@@ -378,6 +378,9 @@ while True:
                 if continue_and_delete:
                     print("[COMPLETE] {}|{}|{}|{}|{}|{}".format(UDN_ID, FileBucket, FileKey, Sample_ID, upload_file_name, file_type), flush=True)
                     message.delete()
+                else:
+                    message.change_visibility(VisibilityTimeout=0)
+
 
             else:
                 print("[ERROR] Message failed to provide all required attributes.", flush=True)
