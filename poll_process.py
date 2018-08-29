@@ -72,7 +72,6 @@ aspera_pass = secret['ups-prod-aspera-pass']
 aspera_vcf_location_code = secret['ups-prod-aspera-location-code-vcf']
 aspera_vcf_key = secret['ups-prod-aspera-vcf-key']
 
-aspera_vcf_key = client.read('secret/udn/ups/aspera_vcf_key')['data']['value']
 aspera_vcf_key_file = open("/aspera/aspera_vcf.pk.64", "w")
 aspera_vcf_key_file.write(aspera_vcf_key)
 aspera_vcf_key_file.flush()
