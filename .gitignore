@@ -1,1 +1,4 @@
 update_repo.sh
+__pycache__/*
+**.pyc
+.vscode/settings.json
