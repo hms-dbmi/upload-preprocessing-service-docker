@@ -8,9 +8,11 @@ import botocore
 import errno
 from subprocess import call, check_output
 import time
+import vcf_trimmer
 import xml.etree.ElementTree as ET
 import codecs
 import tarfile
+
 
 def silentremove(filename):
     try:
@@ -235,6 +237,13 @@ def process_vcf(UDN_ID, sequence_core_alias, FileBucket, FileKey, Sample_ID, upl
     if change_log_file_size != 0:
         print("[DEBUG] Found UDN_ID in file. {}|{}|{}|{}|{}|{}".format(UDN_ID,FileBucket,FileKey,Sample_ID,upload_file_name,file_type),flush=True)
 
+
+    os.rename('/scratch/{}'.format(upload_file_name), '/scratch/{}.bak'.format(upload_file_name))
+    try:
+        vcf_trimmer.trim('/scratch/{}.bak'.format(upload_file_name), '/scratch/{}'.format(upload_file_name))
+    except:
+        print("[DEBUG] Error trimming VCF annotations. {}|{}|{}|{}|{}|{}".format(UDN_ID, FileBucket, FileKey, Sample_ID, upload_file_name, file_type), flush=True)
+        os.rename('/scratch/{}.bak'.format(upload_file_name), '/scratch/{}'.format(upload_file_name))
 
     try:
         print("[DEBUG] Attempting to upload file " + upload_file_name + " via Aspera - subasp@upload.ncbi.nlm.nih.gov:uploads:" + VCF_LOCATION_CODE, flush=True)
