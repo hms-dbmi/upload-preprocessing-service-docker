@@ -3,7 +3,7 @@ import sys
 import hashlib
 import subprocess
 import os
-import hvac
+import json
 import botocore
 import errno
 from subprocess import call, check_output
@@ -25,11 +25,41 @@ def silentremove(filename):
 # Get the name of the SQS queue from the passed in parameters.
 currentQueue = os.environ["QUEUE_NAME"]
 
-# HVAC is vaults python package. Pull the secret key from vault, write it to a file, and base64 decode it.
-client = hvac.Client(url=os.environ['VAULT_ADDRESS'], token=os.environ['ONETIME_TOKEN'], verify=False)
-AsperaKey = client.read('secret/udn/ups/aspera_key')['data']['value']
+# Get the keys from AWS Secrets Manager
+secret_name = "ups-prod"
+endpoint_url = "https://secretsmanager.us-east-1.amazonaws.com"
+region_name = "us-east-1"
+
+session = boto3.session.Session()
+client = session.client(
+    service_name='secretsmanager',
+    region_name=region_name,
+    endpoint_url=endpoint_url
+)
+
+try:
+    get_secret_value_response = client.get_secret_value(
+        SecretId=secret_name
+    )
+except ClientError as e:
+    if e.response['Error']['Code'] == 'ResourceNotFoundException':
+        print("The requested secret " + secret_name + " was not found")
+    elif e.response['Error']['Code'] == 'InvalidRequestException':
+        print("The request was invalid due to:", e)
+    elif e.response['Error']['Code'] == 'InvalidParameterException':
+        print("The request had invalid params:", e)
+    print('Fatal error. Stopping program.')
+    sys.exit()
+else:
+    if 'SecretString' in get_secret_value_response:
+        secret = json.loads(get_secret_value_response['SecretString'])
+    else:
+        print('Fatal error. Unexpected secret type.')
+        sys.exit()
+
+aspera_key = secret['ups-prod-aspera-key']
 aspera_file = open("/aspera/aspera.pk.64", "w")
-aspera_file.write(AsperaKey)
+aspera_file.write(aspera_key)
 aspera_file.flush()
 aspera_file.close()
 aspera_decoded_file = open("/aspera/aspera.pk", "w")
@@ -37,12 +67,11 @@ call(["base64", "-d", "/aspera/aspera.pk.64"], stdout=aspera_decoded_file)
 aspera_decoded_file.close()
 aspera_file.close()
 
-LOCATION_CODE = client.read('secret/udn/ups/aspera_location_code')['data']['value']
-IDSTORE_URL = client.read('secret/udn/ups/idstore_url')['data']['value']
-ASPERA_PASS = client.read('secret/udn/ups/aspera_pass')['data']['value']
-VCF_LOCATION_CODE = client.read('secret/udn/ups/aspera_location_code_vcf')['data']['value']
+aspera_location_code = secret['ups-prod-aspera-location-code']
+aspera_pass = secret['ups-prod-aspera-pass']
+aspera_vcf_location_code = secret['ups-prod-aspera-location-code-vcf']
+aspera_vcf_key = secret['ups-prod-aspera-vcf-key']
 
-aspera_vcf_key = client.read('secret/udn/ups/aspera_vcf_key')['data']['value']
 aspera_vcf_key_file = open("/aspera/aspera_vcf.pk.64", "w")
 aspera_vcf_key_file.write(aspera_vcf_key)
 aspera_vcf_key_file.flush()
@@ -53,17 +82,13 @@ aspera_vcf_key_file_decoded.close()
 aspera_vcf_key_file.close()
 
 # This needs to be set for Aspera to run for VCFs.
-os.environ["ASPERA_SCP_FILEPASS"] = ASPERA_PASS
+os.environ["ASPERA_SCP_FILEPASS"] = aspera_pass
 
 # Initialize AWS objects.
 s3 = boto3.resource('s3')
 sqs = boto3.resource('sqs')
 queue = sqs.get_queue_by_name(QueueName=currentQueue)
 
-
-# --------------------
-
-# --------------------
 
 def xmlIndent(elem, level=0):
     """
@@ -166,8 +191,8 @@ def update_and_ship_XML(upload_file_name, md5):
     tar.close()
 
     try:
-        print("[DEBUG] Attempting to upload file " + tar_file_name + " via Aspera - asp-hms-cc@gap-submit.ncbi.nlm.nih.gov:" + LOCATION_CODE,flush=True)
-        upload_output = check_output(["/home/aspera/.aspera/connect/bin/ascp -i /aspera/aspera.pk -Q -l 5000m -k 1 " + tar_file_name + " asp-hms-cc@gap-submit.ncbi.nlm.nih.gov:" + LOCATION_CODE],shell=True)
+        print("[DEBUG] Attempting to upload file " + tar_file_name + " via Aspera - asp-hms-cc@gap-submit.ncbi.nlm.nih.gov:" + aspera_location_code,flush=True)
+        upload_output = check_output(["/home/aspera/.aspera/connect/bin/ascp -i /aspera/aspera.pk -Q -l 5000m -k 1 " + tar_file_name + " asp-hms-cc@gap-submit.ncbi.nlm.nih.gov:" + aspera_location_code],shell=True)
         print(upload_output, flush=True)
     except:
         print("[ERROR] Error sending files via Aspera - ", sys.exc_info()[:2], flush=True)
@@ -246,8 +271,8 @@ def process_vcf(UDN_ID, sequence_core_alias, FileBucket, FileKey, Sample_ID, upl
         os.rename('/scratch/{}.bak'.format(upload_file_name), '/scratch/{}'.format(upload_file_name))
 
     try:
-        print("[DEBUG] Attempting to upload file " + upload_file_name + " via Aspera - subasp@upload.ncbi.nlm.nih.gov:uploads:" + VCF_LOCATION_CODE, flush=True)
-        upload_output = check_output(["/home/aspera/.aspera/connect/bin/ascp --file-crypt=encrypt -i /aspera/aspera_vcf.pk /scratch/" + upload_file_name + " subasp@upload.ncbi.nlm.nih.gov:uploads/" + VCF_LOCATION_CODE + "/"], shell=True)
+        print("[DEBUG] Attempting to upload file " + upload_file_name + " via Aspera - subasp@upload.ncbi.nlm.nih.gov:uploads:" + aspera_vcf_location_code, flush=True)
+        upload_output = check_output(["/home/aspera/.aspera/connect/bin/ascp --file-crypt=encrypt -i /aspera/aspera_vcf.pk /scratch/" + upload_file_name + " subasp@upload.ncbi.nlm.nih.gov:uploads/" + aspera_vcf_location_code + "/"], shell=True)
         print(upload_output, flush=True)
     except:
         print("[ERROR] Error sending files via Aspera - ", sys.exc_info()[:2], flush=True)
@@ -301,8 +326,8 @@ def process_bam(UDN_ID, sequence_core_alias, FileBucket, FileKey, Sample_ID, upl
 
     # then ship the BAM file
     try:
-        print("[DEBUG] Attempting to upload file " + upload_file_name + " via Aspera - asp-hms-cc@gap-submit.ncbi.nlm.nih.gov:" + LOCATION_CODE,flush=True)
-        upload_output = check_output(["/home/aspera/.aspera/connect/bin/ascp -i /aspera/aspera.pk -Q -l 5000m -k 1 /scratch/" + upload_file_name + " asp-hms-cc@gap-submit.ncbi.nlm.nih.gov:" + LOCATION_CODE],shell=True)
+        print("[DEBUG] Attempting to upload file " + upload_file_name + " via Aspera - asp-hms-cc@gap-submit.ncbi.nlm.nih.gov:" + aspera_location_code,flush=True)
+        upload_output = check_output(["/home/aspera/.aspera/connect/bin/ascp -i /aspera/aspera.pk -Q -l 5000m -k 1 /scratch/" + upload_file_name + " asp-hms-cc@gap-submit.ncbi.nlm.nih.gov:" + aspera_location_code],shell=True)
         print(upload_output, flush=True)
     except:
         print("[ERROR] Error sending files via Aspera - ", sys.exc_info()[:2], flush=True)
@@ -310,6 +335,7 @@ def process_bam(UDN_ID, sequence_core_alias, FileBucket, FileKey, Sample_ID, upl
         return_continue_and_delete = False
 
     return return_continue_and_delete
+
 
 while True:
 
@@ -398,4 +424,3 @@ while True:
                 continue
 
     time.sleep(10)
-

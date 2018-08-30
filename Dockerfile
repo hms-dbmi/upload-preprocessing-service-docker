@@ -15,8 +15,6 @@ RUN runuser -l aspera -c '/aspera/aspera-connect-3.6.2.117442-linux-64.sh'
 
 RUN python3 -m pip install boto3
 RUN python3 -m pip install requests
-RUN python3 -m pip install hvac
-RUN python3 -m pip install hvac
 ADD samtools-1.3.1.tar.bz2 samtools.tar.bz2
 RUN cd samtools.tar.bz2 && cd samtools-1.3.1 && make
 ENV PATH /samtools.tar.bz2/samtools-1.3.1/:$PATH
@@ -34,5 +32,6 @@ COPY bam_extract_header.sh /output/bam_extract_header.sh
 RUN chmod 700 /output/bam_extract_header.sh
 
 COPY poll_process.py /output/poll_process.py
+COPY vcf_trimmer.py /output/vcf_trimmer.py
 
 CMD ["python3","/output/poll_process.py"]
