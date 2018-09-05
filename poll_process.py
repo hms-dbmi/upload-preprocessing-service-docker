@@ -23,7 +23,8 @@ def silentremove(filename):
 
 
 # Get the name of the SQS queue from the passed in parameters.
-currentQueue = os.environ["QUEUE_NAME"]
+currentQueue = 'upload-preprocessing'
+# currentQueue = os.environ["QUEUE_NAME"]
 
 # Get the keys from AWS Secrets Manager
 secret_name = "ups-prod"
@@ -57,32 +58,40 @@ else:
         print('Fatal error. Unexpected secret type.')
         sys.exit()
 
-aspera_key = secret['ups-prod-aspera-key']
-aspera_file = open("/aspera/aspera.pk.64", "w")
-aspera_file.write(aspera_key)
-aspera_file.flush()
-aspera_file.close()
-aspera_decoded_file = open("/aspera/aspera.pk", "w")
-call(["base64", "-d", "/aspera/aspera.pk.64"], stdout=aspera_decoded_file)
-aspera_decoded_file.close()
-aspera_file.close()
+# If testing, do not upload files to DbGap, but instead save the processed file to a special S3 bucket
+TESTING = False
 
-aspera_location_code = secret['ups-prod-aspera-location-code']
-aspera_pass = secret['ups-prod-aspera-pass']
-aspera_vcf_location_code = secret['ups-prod-aspera-location-code-vcf']
-aspera_vcf_key = secret['ups-prod-aspera-vcf-key']
+if TESTING:
+    testing_bucket = 'udn-files-test'
+    testing_folder = 'ups-testing'
+else:
+    aspera_key = secret['ups-prod-aspera-key']
+    aspera_file = open("/aspera/aspera.pk.64", "w")
+    aspera_file.write(aspera_key)
+    aspera_file.flush()
+    aspera_file.close()
+    aspera_decoded_file = open("/aspera/aspera.pk", "w")
+    call(["base64", "-d", "/aspera/aspera.pk.64"], stdout=aspera_decoded_file)
+    aspera_decoded_file.close()
+    aspera_file.close()
 
-aspera_vcf_key_file = open("/aspera/aspera_vcf.pk.64", "w")
-aspera_vcf_key_file.write(aspera_vcf_key)
-aspera_vcf_key_file.flush()
-aspera_vcf_key_file.close()
-aspera_vcf_key_file_decoded = open("/aspera/aspera_vcf.pk", "w")
-call(["base64", "-d", "/aspera/aspera_vcf.pk.64"], stdout=aspera_vcf_key_file_decoded)
-aspera_vcf_key_file_decoded.close()
-aspera_vcf_key_file.close()
+    aspera_location_code = secret['ups-prod-aspera-location-code']
+    aspera_pass = secret['ups-prod-aspera-pass']
+    aspera_vcf_location_code = secret['ups-prod-aspera-location-code-vcf']
+    aspera_vcf_key = secret['ups-prod-aspera-vcf-key']
 
-# This needs to be set for Aspera to run for VCFs.
-os.environ["ASPERA_SCP_FILEPASS"] = aspera_pass
+    aspera_vcf_key_file = open("/aspera/aspera_vcf.pk.64", "w")
+    aspera_vcf_key_file.write(aspera_vcf_key)
+    aspera_vcf_key_file.flush()
+    aspera_vcf_key_file.close()
+    aspera_vcf_key_file_decoded = open("/aspera/aspera_vcf.pk", "w")
+    call(["base64", "-d", "/aspera/aspera_vcf.pk.64"], stdout=aspera_vcf_key_file_decoded)
+    aspera_vcf_key_file_decoded.close()
+    aspera_vcf_key_file.close()
+
+    # TODO does it?
+    # This needs to be set for Aspera to run for VCFs.
+    os.environ["ASPERA_SCP_FILEPASS"] = aspera_pass
 
 # Initialize AWS objects.
 s3 = boto3.resource('s3')
@@ -190,13 +199,20 @@ def update_and_ship_XML(upload_file_name, md5):
             print("[DEBUG] Error adding " + name + " to tar file")
     tar.close()
 
-    try:
-        print("[DEBUG] Attempting to upload file " + tar_file_name + " via Aspera - asp-hms-cc@gap-submit.ncbi.nlm.nih.gov:" + aspera_location_code,flush=True)
-        upload_output = check_output(["/home/aspera/.aspera/connect/bin/ascp -i /aspera/aspera.pk -Q -l 5000m -k 1 " + tar_file_name + " asp-hms-cc@gap-submit.ncbi.nlm.nih.gov:" + aspera_location_code],shell=True)
-        print(upload_output, flush=True)
-    except:
-        print("[ERROR] Error sending files via Aspera - ", sys.exc_info()[:2], flush=True)
-        message.change_visibility(VisibilityTimeout=0)
+    # Do not upload to DbGap if testing
+    if TESTING:
+        s3_filename = testing_folder + '/' + upload_file_name + '.tar'
+        print("[DEBUG] Attempting to copy file " + upload_file_name + " to S3 bucket for storage under " + s3_filename + ".", flush=True)
+        testing_s3 = boto3.resource('s3')
+        testing_s3.meta.client.upload_file(tar_file_name, testing_bucket, s3_filename)
+    else:
+        try:
+            print("[DEBUG] Attempting to upload file " + tar_file_name + " via Aspera - asp-hms-cc@gap-submit.ncbi.nlm.nih.gov:" + aspera_location_code,flush=True)
+            upload_output = check_output(["/home/aspera/.aspera/connect/bin/ascp -i /aspera/aspera.pk -Q -l 5000m -k 1 " + tar_file_name + " asp-hms-cc@gap-submit.ncbi.nlm.nih.gov:" + aspera_location_code],shell=True)
+            print(upload_output, flush=True)
+        except:
+            print("[ERROR] Error sending files via Aspera - ", sys.exc_info()[:2], flush=True)
+            message.change_visibility(VisibilityTimeout=0)
 
     silentremove(tar_file_name)
     silentremove(temp_run_file)
@@ -233,7 +249,7 @@ def process_vcf(UDN_ID, sequence_core_alias, FileBucket, FileKey, Sample_ID, upl
 
     if change_log_file_size == 0:
         print("[DEBUG] Error swapping identifiers in file. Changelog file is empty. {}|{}|{}|{}|{}|{}".format(UDN_ID,FileBucket,FileKey,Sample_ID,upload_file_name,file_type),flush=True)
-        
+
         # try to remove shortened alias with exact match
         seq_alias_prefix = sequence_core_alias.split('-')[0]
         call(["sed -i -e 's/\<"+seq_alias_prefix+"\>/"+Sample_ID+"/gw /scratch/changelog.txt' /scratch/"+upload_file_name], shell=True)
@@ -270,14 +286,21 @@ def process_vcf(UDN_ID, sequence_core_alias, FileBucket, FileKey, Sample_ID, upl
         print("[DEBUG] Error trimming VCF annotations. {}|{}|{}|{}|{}|{}".format(UDN_ID, FileBucket, FileKey, Sample_ID, upload_file_name, file_type), flush=True)
         os.rename('/scratch/{}.bak'.format(upload_file_name), '/scratch/{}'.format(upload_file_name))
 
-    try:
-        print("[DEBUG] Attempting to upload file " + upload_file_name + " via Aspera - subasp@upload.ncbi.nlm.nih.gov:uploads:" + aspera_vcf_location_code, flush=True)
-        upload_output = check_output(["/home/aspera/.aspera/connect/bin/ascp --file-crypt=encrypt -i /aspera/aspera_vcf.pk /scratch/" + upload_file_name + " subasp@upload.ncbi.nlm.nih.gov:uploads/" + aspera_vcf_location_code + "/"], shell=True)
-        print(upload_output, flush=True)
-    except:
-        print("[ERROR] Error sending files via Aspera - ", sys.exc_info()[:2], flush=True)
-        return_continue_and_delete = False
-        message.change_visibility(VisibilityTimeout=0)
+    # Do not upload to DbGap if testing
+    if TESTING:
+        s3_filename = testing_folder + '/' + upload_file_name
+        print("[DEBUG] Attempting to copy file " + upload_file_name + " to S3 bucket for storage under " + s3_filename + ".", flush=True)
+        testing_s3 = boto3.resource('s3')
+        testing_s3.meta.client.upload_file('/scratch/' + upload_file_name, testing_bucket, s3_filename)
+    else:
+        try:
+            print("[DEBUG] Attempting to upload file " + upload_file_name + " via Aspera - subasp@upload.ncbi.nlm.nih.gov:uploads:" + aspera_vcf_location_code, flush=True)
+            upload_output = check_output(["/home/aspera/.aspera/connect/bin/ascp --file-crypt=encrypt -i /aspera/aspera_vcf.pk /scratch/" + upload_file_name + " subasp@upload.ncbi.nlm.nih.gov:uploads/" + aspera_vcf_location_code + "/"], shell=True)
+            print(upload_output, flush=True)
+        except:
+            print("[ERROR] Error sending files via Aspera - ", sys.exc_info()[:2], flush=True)
+            return_continue_and_delete = False
+            message.change_visibility(VisibilityTimeout=0)
 
     return return_continue_and_delete
 
@@ -324,15 +347,22 @@ def process_bam(UDN_ID, sequence_core_alias, FileBucket, FileKey, Sample_ID, upl
     if not xml_success:
         return False
 
-    # then ship the BAM file
-    try:
-        print("[DEBUG] Attempting to upload file " + upload_file_name + " via Aspera - asp-hms-cc@gap-submit.ncbi.nlm.nih.gov:" + aspera_location_code,flush=True)
-        upload_output = check_output(["/home/aspera/.aspera/connect/bin/ascp -i /aspera/aspera.pk -Q -l 5000m -k 1 /scratch/" + upload_file_name + " asp-hms-cc@gap-submit.ncbi.nlm.nih.gov:" + aspera_location_code],shell=True)
-        print(upload_output, flush=True)
-    except:
-        print("[ERROR] Error sending files via Aspera - ", sys.exc_info()[:2], flush=True)
-        message.change_visibility(VisibilityTimeout=0)
-        return_continue_and_delete = False
+    # Do not upload to DbGap if testing
+    if TESTING:
+        s3_filename = testing_folder + '/' + upload_file_name + '.tar'
+        print("[DEBUG] Attempting to copy file " + upload_file_name + " to S3 bucket for storage under " + s3_filename + ".", flush=True)
+        testing_s3 = boto3.resource('s3')
+        testing_s3.meta.client.upload_file("/scratch/" + upload_file_name, testing_bucket, s3_filename)
+    else:
+        # then ship the BAM file
+        try:
+            print("[DEBUG] Attempting to upload file " + upload_file_name + " via Aspera - asp-hms-cc@gap-submit.ncbi.nlm.nih.gov:" + aspera_location_code,flush=True)
+            upload_output = check_output(["/home/aspera/.aspera/connect/bin/ascp -i /aspera/aspera.pk -Q -l 5000m -k 1 /scratch/" + upload_file_name + " asp-hms-cc@gap-submit.ncbi.nlm.nih.gov:" + aspera_location_code],shell=True)
+            print(upload_output, flush=True)
+        except:
+            print("[ERROR] Error sending files via Aspera - ", sys.exc_info()[:2], flush=True)
+            message.change_visibility(VisibilityTimeout=0)
+            return_continue_and_delete = False
 
     return return_continue_and_delete
 
