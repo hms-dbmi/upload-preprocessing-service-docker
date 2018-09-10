@@ -59,11 +59,13 @@ else:
         sys.exit()
 
 # If testing, do not upload files to DbGap, but instead save the processed file to a special S3 bucket
-TESTING = False
+TESTING = True
 
 if TESTING:
     testing_bucket = 'udn-files-test'
     testing_folder = 'ups-testing'
+    
+    print("[DEBUG] Starting up in TEST mode. All processed files will be uploaded to the " + testing_bucket + " bucket in S3 instead of being uploaded to dbgap.", flush=True)
 else:
     aspera_key = secret['ups-prod-aspera-key']
     aspera_file = open("/aspera/aspera.pk.64", "w")
