@@ -232,58 +232,11 @@ def process_vcf(UDN_ID, sequence_core_alias, FileBucket, FileKey, Sample_ID, upl
 
     os.rename(tempFile, "/scratch/" + upload_file_name)
 
-    print("[DEBUG] Replacing sample_ID", flush=True)
-
-    try:
-        os.remove('/scratch/changelog.txt')
-    except OSError:
-        pass
-
-    empty_string = ''
-    call(["sed -i -e 's/" + sequence_core_alias + "/" + Sample_ID + "/gw /scratch/changelog.txt'  /scratch/" + upload_file_name], shell=True)
-
-    change_log_file_size = 0
-
-    try:
-        change_log_file_size = os.path.getsize('/scratch/changelog.txt')
-    except OSError:
-        print("[DEBUG] Error swapping identifiers in file. Changelog file not found after sed. {}|{}|{}|{}|{}|{}".format(UDN_ID, FileBucket, FileKey, Sample_ID, upload_file_name, file_type), flush=True)
-
-    if change_log_file_size == 0:
-        print("[DEBUG] Error swapping identifiers in file. Changelog file is empty. {}|{}|{}|{}|{}|{}".format(UDN_ID,FileBucket,FileKey,Sample_ID,upload_file_name,file_type),flush=True)
-
-        # try to remove shortened alias with exact match
-        seq_alias_prefix = sequence_core_alias.split('-')[0]
-        call(["sed -i -e 's/\<"+seq_alias_prefix+"\>/"+Sample_ID+"/gw /scratch/changelog.txt' /scratch/"+upload_file_name], shell=True)
-
-        try:
-            change_log_file_size = os.path.getsize('/scratch/changelog.txt')
-        except OSError:
-            print("[DEBUG] Error swapping identifiers in file. Changelog file not found after sed. {}|{}|{}|{}|{}|{}".format(UDN_ID, FileBucket, FileKey, Sample_ID, upload_file_name, file_type), flush=True)
-
-        if change_log_file_size == 0:
-            print("[DEBUG] Error swapping alias prefix in file. Not sending file. Changelog file is empty {} | {} | {}".format(upload_file_name, UDN_ID, sequence_core_alias))
-            return False
-
-    try:
-        os.remove('/scratch/changelog.txt')
-    except OSError:
-        pass
-
-    call(["sed -i -e 's/" + UDN_ID + "/" + empty_string + "/gw /scratch/changelog.txt'  /scratch/" + upload_file_name], shell=True)
-
-    try:
-        change_log_file_size = os.path.getsize('/scratch/changelog.txt')
-    except OSError:
-        print("[DEBUG] Error swapping identifiers in file. Changelog file not found after sed. {}|{}|{}|{}|{}|{}".format(UDN_ID, FileBucket, FileKey, Sample_ID, upload_file_name, file_type), flush=True)
-
-    if change_log_file_size != 0:
-        print("[DEBUG] Found UDN_ID in file. {}|{}|{}|{}|{}|{}".format(UDN_ID,FileBucket,FileKey,Sample_ID,upload_file_name,file_type),flush=True)
-
+    print("[DEBUG] Replacing sample_ID and removing extra VCF info", flush=True)
 
     os.rename('/scratch/{}'.format(upload_file_name), '/scratch/{}.bak'.format(upload_file_name))
     try:
-        vcf_trimmer.trim('/scratch/{}.bak'.format(upload_file_name), '/scratch/{}'.format(upload_file_name))
+        vcf_trimmer.trim('/scratch/{}.bak'.format(upload_file_name), '/scratch/{}'.format(upload_file_name), Sample_ID)
     except:
         print("[DEBUG] Error trimming VCF annotations. {}|{}|{}|{}|{}|{}".format(UDN_ID, FileBucket, FileKey, Sample_ID, upload_file_name, file_type), flush=True)
         os.rename('/scratch/{}.bak'.format(upload_file_name), '/scratch/{}'.format(upload_file_name))
