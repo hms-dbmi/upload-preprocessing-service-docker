@@ -280,11 +280,12 @@ def process_bam(UDN_ID, sequence_core_alias, FileBucket, FileKey, Sample_ID, upl
                 item.split(':', 1)
                 for item in header.split('\t')[1:]  # don't include @RG token
             ]
-            output_tags = [
+            output_tags = [('ID', '0')]  # sometimes ID field has nontrivial identifiers in it
+            output_tags.extend(
                 (tag_name, data)
                 for tag_name, data in tag_pairs
-                if tag_name in ('ID', 'PL', 'DT', 'CN')  # retain these
-            ]
+                if tag_name in ('PL', 'DT', 'CN')  # retain these
+            )
             output_tags.append(('SM', Sample_ID))  # add in new sample ID
             new_header = '\t'.join(
                 ['@RG'] + [':'.join(pair) for pair in output_tags]
