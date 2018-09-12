@@ -302,7 +302,7 @@ def process_bam(UDN_ID, sequence_core_alias, FileBucket, FileKey, Sample_ID, upl
     with open('/scratch/md5_reheader', 'wb') as f:
         try:
             call([
-                'samtools', 'reheader', '/scratch/new_headers.sam', tempFile
+                'samtools', 'reheader', '-P', '/scratch/new_headers.sam', tempFile
             ], stdout=f)  # more secure alternative to `shell=True` with redirection
         except CalledProcessError as e:
             print("[DEBUG] Error reheading bam file. Error code {}. {}|{}|{}|{}|{}|{}".format(
