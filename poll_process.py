@@ -64,7 +64,7 @@ TESTING = True
 if TESTING:
     testing_bucket = 'udn-files-test'
     testing_folder = 'ups-testing'
-    
+
     print("[DEBUG] Starting up in TEST mode. All processed files will be uploaded to the " + testing_bucket + " bucket in S3 instead of being uploaded to dbgap.", flush=True)
 else:
     aspera_key = secret['ups-prod-aspera-key']
@@ -204,7 +204,7 @@ def update_and_ship_XML(upload_file_name, md5):
     # Do not upload to DbGap if testing
     if TESTING:
         s3_filename = testing_folder + '/' + upload_file_name + '.tar'
-        print("[DEBUG] Attempting to copy file " + upload_file_name + " to S3 bucket for storage under " + s3_filename + ".", flush=True)
+        print("[DEBUG] Attempting to copy file " + upload_file_name + ".tar to S3 bucket for storage under " + s3_filename + ".", flush=True)
         testing_s3 = boto3.resource('s3')
         testing_s3.meta.client.upload_file(tar_file_name, testing_bucket, s3_filename)
     else:
@@ -351,7 +351,7 @@ def process_bam(UDN_ID, sequence_core_alias, FileBucket, FileKey, Sample_ID, upl
 
     # Do not upload to DbGap if testing
     if TESTING:
-        s3_filename = testing_folder + '/' + upload_file_name + '.tar'
+        s3_filename = testing_folder + '/' + upload_file_name
         print("[DEBUG] Attempting to copy file " + upload_file_name + " to S3 bucket for storage under " + s3_filename + ".", flush=True)
         testing_s3 = boto3.resource('s3')
         testing_s3.meta.client.upload_file("/scratch/" + upload_file_name, testing_bucket, s3_filename)
