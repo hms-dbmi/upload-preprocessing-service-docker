@@ -9,20 +9,35 @@ WHITELISTED_ANNOTATIONS = {
 }
 
 
-def process_header(line):
-    """Returns the header line unchanged, unless it's an INFO header for an
-    annotation that isn't in the whitelist.
+def process_header(line, new_ids=None):
+    """Removes header lines that feature extraneous data (command lines, etc)
+    or INFO field annotations which are not whitelisted. Also replaces the
+    sample IDs with the sequence of IDs in `new_ids`.
     """
 
+    # extraneous headers
+    if line.startswith('##') and not any(
+            line.startswith('##' + header_type)
+            for header_type in (
+                'fileformat', 'INFO', 'FILTER', 'FORMAT', 'ALT', 'contig'
+            )
+    ):
+        return None
+
+    # non-whitelisted annotations
     match = re.match(r'##INFO=<ID=([^,]+)', line)
-    if not match:
-        return line
+    if match:
+        info_name = match.group(1)
+        if info_name not in WHITELISTED_ANNOTATIONS:
+            return None
 
-    info_name = match.group(1)
-    if info_name in WHITELISTED_ANNOTATIONS:
-        return line
+    # update sample IDs
+    if line.startswith('#CHROM') and new_ids is not None:
+        fields = line.strip().split('\t')[:9]  # fixed headers
+        fields.extend(new_ids)
+        line = '\t'.join(fields) + '\n'
 
-    return None  # will not be output to file
+    return line
 
 
 def process_body(line):
@@ -43,13 +58,14 @@ def process_body(line):
     return '\t'.join(fields)
 
 
-def trim(from_file, to_file):
-    """Trims unwanted INFO annotations from a VCF file, including the header."""
+def trim(from_file, to_file, new_id):
+    """Trims unwanted INFO annotations from a VCF file, including the header.
+    Also replaces sample ID."""
 
     with open(from_file) as f_input, open(to_file, 'w') as f_output:
         for line in f_input:
             if line.startswith('#'):
-                result = process_header(line)
+                result = process_header(line, (new_id,))
             else:
                 result = process_body(line)
 
