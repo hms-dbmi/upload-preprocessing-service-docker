@@ -25,12 +25,6 @@ RUN mkdir /output/
 RUN mkdir /.aws/
 COPY config /.aws/config
 
-COPY bam_rehead.sh /output/bam_rehead.sh
-RUN chmod 700 /output/bam_rehead.sh
-
-COPY bam_extract_header.sh /output/bam_extract_header.sh
-RUN chmod 700 /output/bam_extract_header.sh
-
 COPY poll_process.py /output/poll_process.py
 COPY vcf_trimmer.py /output/vcf_trimmer.py
 
