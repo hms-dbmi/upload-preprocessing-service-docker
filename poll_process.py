@@ -32,14 +32,14 @@ endpoint_url = "https://secretsmanager.us-east-1.amazonaws.com"
 region_name = "us-east-1"
 
 session = boto3.session.Session()
-client = session.client(
+secrets_client = session.client(
     service_name='secretsmanager',
     region_name=region_name,
     endpoint_url=endpoint_url
 )
 
 try:
-    get_secret_value_response = client.get_secret_value(
+    secret_response = secrets_client.get_secret_value(
         SecretId=secret_name
     )
 except ClientError as e:
@@ -52,44 +52,65 @@ except ClientError as e:
     print('Fatal error. Stopping program.')
     sys.exit()
 else:
-    if 'SecretString' in get_secret_value_response:
-        secret = json.loads(get_secret_value_response['SecretString'])
+    if 'SecretString' in secret_response:
+        secret = json.loads(secret_response['SecretString'])
     else:
         print('Fatal error. Unexpected secret type.')
         sys.exit()
 
-# If testing, do not upload files to DbGap, but instead save the processed file to a special S3 bucket
-TESTING = True
+try: 
+    aspera_key_secret = secrets_client.get_secret_value(SecretId='ups-prod-aspera-key')
+except ClientError as e:
+    if e.response['Error']['Code'] == 'ResourceNotFoundException':
+        print("ups-prod-aspera-key not found")
+    elif e.response['Error']['Code'] == 'InvalidRequestException':
+        print("Invalid Request: ", e)
+    elif e.response['Error']['Code'] == 'InvalidParameterException':
+        print("Invalid parameters: ", e)
+    print('Fatal error. Stopping program.')
+    sys.exit()
+else:
+    if 'SecretBinary' in aspera_key_secret:
+        aspera_file = open("/aspera/aspera.pk", "w")
+        aspera_file.write(aspera_key_secret['SecretBinary'])
+        aspera_file.flush()
+        aspera_file.close()
+    else: 
+        print('Fatal error. Unable to locate aspera-key')
+        sys.exit()
 
-if TESTING:
+try: 
+    aspera_vcf_key_secret = secrets_client.get_secret_value(SecretId='ups-prod-aspera-vcf-key')
+except ClientError as e:
+    if e.response['Error']['Code'] == 'ResourceNotFoundException':
+        print("ups-prod-aspera-key not found")
+    elif e.response['Error']['Code'] == 'InvalidRequestException':
+        print("Invalid Request: ", e)
+    elif e.response['Error']['Code'] == 'InvalidParameterException':
+        print("Invalid parameters: ", e)
+    print('Fatal error. Stopping program.')
+    sys.exit()
+else:
+    if 'SecretBinary' in aspera_vcf_key_secret:
+        aspera_vcf_file = open("/aspera/aspera_vcf.pk", "w")
+        aspera_vcf_file.write(aspera_vcf_key_secret['SecretBinary'])
+        aspera_vcf_file.flush()
+        aspera_vcf_file.close()
+    else: 
+        print('Fatal error. Unable to locate aspera-vcf-key')
+        sys.exit()
+
+# If testing, do not upload files to DbGap, but instead save the processed file to a special S3 bucket
+# use 'status' in the secret to control this.  anything other than 'test' will go outside
+if secret['status'] == 'test':
     testing_bucket = 'udn-files-test'
     testing_folder = 'ups-testing'
 
     print("[DEBUG] Starting up in TEST mode. All processed files will be uploaded to the " + testing_bucket + " bucket in S3 instead of being uploaded to dbgap.", flush=True)
 else:
-    aspera_key = secret['ups-prod-aspera-key']
-    aspera_file = open("/aspera/aspera.pk.64", "w")
-    aspera_file.write(aspera_key)
-    aspera_file.flush()
-    aspera_file.close()
-    aspera_decoded_file = open("/aspera/aspera.pk", "w")
-    call(["base64", "-d", "/aspera/aspera.pk.64"], stdout=aspera_decoded_file)
-    aspera_decoded_file.close()
-    aspera_file.close()
-
-    aspera_location_code = secret['ups-prod-aspera-location-code']
-    aspera_pass = secret['ups-prod-aspera-pass']
-    aspera_vcf_location_code = secret['ups-prod-aspera-location-code-vcf']
-    aspera_vcf_key = secret['ups-prod-aspera-vcf-key']
-
-    aspera_vcf_key_file = open("/aspera/aspera_vcf.pk.64", "w")
-    aspera_vcf_key_file.write(aspera_vcf_key)
-    aspera_vcf_key_file.flush()
-    aspera_vcf_key_file.close()
-    aspera_vcf_key_file_decoded = open("/aspera/aspera_vcf.pk", "w")
-    call(["base64", "-d", "/aspera/aspera_vcf.pk.64"], stdout=aspera_vcf_key_file_decoded)
-    aspera_vcf_key_file_decoded.close()
-    aspera_vcf_key_file.close()
+    aspera_location_code = secret['aspera-location-code']
+    aspera_pass = secret['aspera-pass']
+    aspera_vcf_location_code = secret['aspera-location-code-vcf']
 
     # TODO does it?
     # This needs to be set for Aspera to run for VCFs.
