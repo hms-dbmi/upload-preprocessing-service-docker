@@ -271,7 +271,7 @@ def process_vcf(UDN_ID, sequence_core_alias, FileBucket, FileKey, Sample_ID, upl
     else:
         try:
             print("[DEBUG] Attempting to upload file " + upload_file_name + " via Aspera - subasp@upload.ncbi.nlm.nih.gov:uploads:" + aspera_vcf_location_code, flush=True)
-            upload_output = check_output(["/home/aspera/.aspera/connect/bin/ascp --file-crypt=encrypt -i /aspera/aspera_vcf.pk /scratch/" + upload_file_name + " subasp@upload.ncbi.nlm.nih.gov:uploads/" + aspera_vcf_location_code + "/"], shell=True)
+            upload_output = check_output(["/home/aspera/.aspera/connect/bin/ascp --file-crypt=encrypt -i /aspera/aspera_vcf.pk /scratch/" + upload_file_name + " subasp@upload.ncbi.nlm.nih.gov:uploads/upload_requests/" + aspera_vcf_location_code + "/"], shell=True)
             print(upload_output, flush=True)
         except:
             print("[ERROR] Error sending files via Aspera - ", sys.exc_info()[:2], flush=True)
