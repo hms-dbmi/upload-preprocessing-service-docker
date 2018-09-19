@@ -71,7 +71,7 @@ except ClientError as e:
     sys.exit()
 else:
     if 'SecretBinary' in aspera_key_secret:
-        aspera_file = open("/aspera/aspera.pk", "w")
+        aspera_file = open("/aspera/aspera.pk", "wb")
         aspera_file.write(aspera_key_secret['SecretBinary'])
         aspera_file.flush()
         aspera_file.close()
@@ -92,7 +92,7 @@ except ClientError as e:
     sys.exit()
 else:
     if 'SecretBinary' in aspera_vcf_key_secret:
-        aspera_vcf_file = open("/aspera/aspera_vcf.pk", "w")
+        aspera_vcf_file = open("/aspera/aspera_vcf.pk", "wb")
         aspera_vcf_file.write(aspera_vcf_key_secret['SecretBinary'])
         aspera_vcf_file.flush()
         aspera_vcf_file.close()
@@ -223,14 +223,14 @@ def update_and_ship_XML(upload_file_name, md5):
     tar.close()
 
     # Do not upload to DbGap if testing
-    if TESTING:
+    if secret['status'] == 'test':
         s3_filename = testing_folder + '/' + upload_file_name + '.tar'
         print("[DEBUG] Attempting to copy file " + upload_file_name + ".tar to S3 bucket for storage under " + s3_filename + ".", flush=True)
         testing_s3 = boto3.resource('s3')
         testing_s3.meta.client.upload_file(tar_file_name, testing_bucket, s3_filename)
     else:
         try:
-            print("[DEBUG] Attempting to upload file " + tar_file_name + " via Aspera - asp-hms-cc@gap-submit.ncbi.nlm.nih.gov:" + aspera_location_code,flush=True)
+            print("[DEBUG] Attempting to upload file " + tar_file_name + " via Aspera - asp-hms-cc@gap-submit.ncbi.nlm.nih.gov:" + aspera_location_code, flush=True)
             upload_output = check_output(["/home/aspera/.aspera/connect/bin/ascp -i /aspera/aspera.pk -Q -l 5000m -k 1 " + tar_file_name + " asp-hms-cc@gap-submit.ncbi.nlm.nih.gov:" + aspera_location_code],shell=True)
             print(upload_output, flush=True)
         except:
@@ -263,7 +263,7 @@ def process_vcf(UDN_ID, sequence_core_alias, FileBucket, FileKey, Sample_ID, upl
         os.rename('/scratch/{}.bak'.format(upload_file_name), '/scratch/{}'.format(upload_file_name))
 
     # Do not upload to DbGap if testing
-    if TESTING:
+    if secret['status'] == 'test':
         s3_filename = testing_folder + '/' + upload_file_name
         print("[DEBUG] Attempting to copy file " + upload_file_name + " to S3 bucket for storage under " + s3_filename + ".", flush=True)
         testing_s3 = boto3.resource('s3')
@@ -351,7 +351,7 @@ def process_bam(UDN_ID, sequence_core_alias, FileBucket, FileKey, Sample_ID, upl
         return False
 
     # Do not upload to DbGap if testing
-    if TESTING:
+    if secret['status'] == 'test':
         s3_filename = testing_folder + '/' + upload_file_name
         print("[DEBUG] Attempting to copy file " + upload_file_name + " to S3 bucket for storage under " + s3_filename + ".", flush=True)
         testing_s3 = boto3.resource('s3')
