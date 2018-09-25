@@ -1,6 +1,6 @@
 FROM ubuntu
 
-RUN apt-get update && apt-get install -y gcc make bzip2 zlib1g-dev ncurses-dev
+RUN apt-get update && apt-get install -y gcc make bzip2 zlib1g-dev ncurses-dev libbz2-dev liblzma-dev
 RUN apt-get update && apt-get install -y python3
 RUN apt-get update && apt-get install -y python3-pip
 RUN apt-get update && apt-get install -y wget
@@ -18,6 +18,11 @@ RUN python3 -m pip install requests
 ADD samtools-1.3.1.tar.bz2 samtools.tar.bz2
 RUN cd samtools.tar.bz2 && cd samtools-1.3.1 && make
 ENV PATH /samtools.tar.bz2/samtools-1.3.1/:$PATH
+
+ADD htslib-1.9.tar.bz2 htslib.tar.bz2
+RUN cd htslib.tar.bz2 && cd htslib-1.9 && make
+ENV PATH /htslib.tar.bz2/htslib-1.9/:$PATH
+
 ENV AWS_CONFIG_FILE /.aws/config
 
 RUN mkdir /output/
