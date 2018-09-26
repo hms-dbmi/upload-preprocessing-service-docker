@@ -12,6 +12,7 @@ import vcf_trimmer
 import xml.etree.ElementTree as ET
 import codecs
 import tarfile
+import pysam
 
 
 def silentremove(filename):
@@ -245,6 +246,37 @@ def update_and_ship_XML(upload_file_name, md5):
     return True
 
 
+def upload_vcf_archive():
+    if not os.path.exists('/scratch/vcf_archive.tar'):
+        return
+
+    return_value = True
+
+    upload_file_name = time.strftime('vcf_archive_%Y%m%d%H%M%S.tar')
+    os.rename('/scratch/vcf_archive.tar', '/scratch/{}'.format(upload_file_name))
+
+    # Do not upload to DbGap if testing
+    if secret['status'] == 'test':
+        s3_filename = testing_folder + '/' + upload_file_name
+        print("[DEBUG] Attempting to copy file " + upload_file_name + " to S3 bucket for storage under " + s3_filename + ".", flush=True)
+        testing_s3 = boto3.resource('s3')
+        testing_s3.meta.client.upload_file('/scratch/' + upload_file_name, testing_bucket, s3_filename)
+    else:
+        try:
+            upload_location = "subasp@upload.ncbi.nlm.nih.gov:uploads/upload_requests/" + aspera_vcf_location_code + "/"
+            print("[DEBUG] Attempting to upload file " + upload_file_name + " via Aspera to " + upload_location, flush=True)
+            upload_output = check_output(["/home/aspera/.aspera/connect/bin/ascp --file-crypt=encrypt -i /aspera/aspera_vcf.pk /scratch/" + upload_file_name + " " + upload_location], shell=True)
+            print(upload_output, flush=True)
+        except:
+            print("[ERROR] Error sending files via Aspera - ", sys.exc_info()[:2], flush=True)
+            return_value = False
+            message.change_visibility(VisibilityTimeout=0)
+
+    silentremove('/scratch/{}'.format(upload_file_name))
+
+    return return_value
+
+
 def process_vcf(UDN_ID, sequence_core_alias, FileBucket, FileKey, Sample_ID, upload_file_name, file_type):
 
     return_continue_and_delete = True
@@ -262,22 +294,23 @@ def process_vcf(UDN_ID, sequence_core_alias, FileBucket, FileKey, Sample_ID, upl
         print("[DEBUG] Error trimming VCF annotations. {}|{}|{}|{}|{}|{}".format(UDN_ID, FileBucket, FileKey, Sample_ID, upload_file_name, file_type), flush=True)
         os.rename('/scratch/{}.bak'.format(upload_file_name), '/scratch/{}'.format(upload_file_name))
 
-    # Do not upload to DbGap if testing
-    if secret['status'] == 'test':
-        s3_filename = testing_folder + '/' + upload_file_name
-        print("[DEBUG] Attempting to copy file " + upload_file_name + " to S3 bucket for storage under " + s3_filename + ".", flush=True)
-        testing_s3 = boto3.resource('s3')
-        testing_s3.meta.client.upload_file('/scratch/' + upload_file_name, testing_bucket, s3_filename)
-    else:
-        try:
-            upload_location = "subasp@upload.ncbi.nlm.nih.gov:uploads/upload_requests/" + aspera_vcf_location_code + "/"
-            print("[DEBUG] Attempting to upload file " + upload_file_name + " via Aspera to " + upload_location, flush=True)
-            upload_output = check_output(["/home/aspera/.aspera/connect/bin/ascp --file-crypt=encrypt -i /aspera/aspera_vcf.pk /scratch/" + upload_file_name + " " + upload_location], shell=True)
-            print(upload_output, flush=True)
-        except:
-            print("[ERROR] Error sending files via Aspera - ", sys.exc_info()[:2], flush=True)
+    print("[DEBUG] Compressing and indexing VCF", flush=True)
+    pysam.tabix_index('/scratch/{}'.format(upload_file_name), preset='vcf')
+
+    try:
+        archive_size = os.path.getsize('/scratch/vcf_archive.tar')
+    except OSError:
+        archive_size = 0
+    vcf_size = os.path.getsize('/scratch/{}.gz'.format(upload_file_name))
+    if archive_size + vcf_size > 1024**4:  # 1TB
+        result = upload_vcf_archive()
+        if not result:
             return_continue_and_delete = False
-            message.change_visibility(VisibilityTimeout=0)
+
+    with tarfile.TarFile('/scratch/vcf_archive.tar', 'a') as archive:
+        for name in ('{}.gz'.format(upload_file_name), '{}.gz.tbi'.format(upload_file_name)):
+            archive.add('/scratch/{}'.format(name), arcname=name)
+            os.remove('/scratch/{}'.format(name))
 
     return return_continue_and_delete
 
@@ -456,5 +489,7 @@ while True:
                 print(message)
                 message.change_visibility(VisibilityTimeout=0)
                 continue
+
+    upload_vcf_archive()
 
     time.sleep(10)
