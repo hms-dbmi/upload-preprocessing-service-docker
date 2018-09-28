@@ -308,6 +308,7 @@ def process_vcf(UDN_ID, FileBucket, FileKey, Sample_ID, upload_file_name, file_t
             return_continue_and_delete = False
 
     with tarfile.TarFile('/scratch/vcf_archive.tar', 'a') as archive:
+        print("[DEBUG] adding {} to archive".format(upload_file_name))
         for name in ('{}.gz'.format(upload_file_name), '{}.gz.tbi'.format(upload_file_name)):
             archive.add('/scratch/{}'.format(name), arcname=name)
             os.remove('/scratch/{}'.format(name))
@@ -422,8 +423,7 @@ while True:
         messages = queue.receive_messages(
             MaxNumberOfMessages=10, 
             MessageAttributeNames=['UDN_ID', 'FileBucket', 'FileKey', 'sample_ID', 'file_service_uuid', 'file_type', 'md5'])
-        print("Found Messages, processing.", flush=True)
-
+    print("[DEBUG] found {} messages".format(len(message_list)))
     for message in message_list:
         continue_and_delete = True
 
