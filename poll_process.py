@@ -408,9 +408,21 @@ while True:
 
     print("Retrieving messages from queue - '" + currentQueue + "'", flush=True)
 
-    for message in queue.receive_messages(MaxNumberOfMessages=1, MessageAttributeNames=['UDN_ID', 'FileBucket', 'FileKey', 'sample_ID', 'file_service_uuid', 'file_type', 'md5']):
+    # get all messages from the queue 
+    # boto3 only allows retrieving 10 messages at a time so we'll load them all here first
+    # and then process the entire list of messages
+
+    message_list = []
+    messages = queue.receive_messages(
+        MaxNumberOfMessages=10, 
+        MessageAttributeNames=['UDN_ID', 'FileBucket', 'FileKey', 'sample_ID', 'file_service_uuid', 'file_type', 'md5']
+        )
+    while len(messages) > 0:
+        message_list.extend(messages)
+        messages = queue.receive_messages(MaxNumberOfMessages=10, MessageAttributeNames=['UDN_ID', 'FileBucket', 'FileKey', 'sample_ID', 'file_service_uuid', 'file_type', 'md5']):
         print("Found Messages, processing.", flush=True)
 
+    for message in message_list:
         continue_and_delete = True
 
         if message.message_attributes is not None:
