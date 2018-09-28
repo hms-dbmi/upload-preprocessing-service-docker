@@ -277,7 +277,7 @@ def upload_vcf_archive():
     return return_value
 
 
-def process_vcf(UDN_ID, sequence_core_alias, FileBucket, FileKey, Sample_ID, upload_file_name, file_type):
+def process_vcf(UDN_ID, FileBucket, FileKey, Sample_ID, upload_file_name, file_type):
 
     return_continue_and_delete = True
 
@@ -315,7 +315,7 @@ def process_vcf(UDN_ID, sequence_core_alias, FileBucket, FileKey, Sample_ID, upl
     return return_continue_and_delete
 
 
-def process_bam(UDN_ID, sequence_core_alias, FileBucket, FileKey, Sample_ID, upload_file_name, file_type, md5):
+def process_bam(UDN_ID, FileBucket, FileKey, Sample_ID, upload_file_name, file_type, md5):
 
     return_continue_and_delete = True
 
@@ -408,14 +408,13 @@ while True:
 
     print("Retrieving messages from queue - '" + currentQueue + "'", flush=True)
 
-    for message in queue.receive_messages(MaxNumberOfMessages=1, MessageAttributeNames=['UDN_ID', 'FileBucket', 'FileKey', 'sample_ID', 'file_service_uuid', 'file_type', 'md5', 'sequence_core_alias']):
+    for message in queue.receive_messages(MaxNumberOfMessages=1, MessageAttributeNames=['UDN_ID', 'FileBucket', 'FileKey', 'sample_ID', 'file_service_uuid', 'file_type', 'md5']):
         print("Found Messages, processing.", flush=True)
 
         continue_and_delete = True
 
         if message.message_attributes is not None:
             UDN_ID = message.message_attributes.get('UDN_ID').get('StringValue')
-            sequence_core_alias = message.message_attributes.get('sequence_core_alias').get('StringValue')
             FileBucket = message.message_attributes.get('FileBucket').get('StringValue')
             FileKey = message.message_attributes.get('FileKey').get('StringValue')
             Sample_ID = message.message_attributes.get('sample_ID').get('StringValue')
@@ -429,7 +428,7 @@ while True:
 
             upload_file_name = "%s%s" % (message.message_attributes.get('file_service_uuid').get('StringValue'), filename_extension)
 
-            if UDN_ID and sequence_core_alias and FileBucket and FileKey and Sample_ID and upload_file_name and file_type:
+            if UDN_ID and FileBucket and FileKey and Sample_ID and upload_file_name and file_type:
                 print("[DEBUG] Processing UDN_ID - " + UDN_ID + ".", flush=True)
                 print("[DEBUG] Downloading file. Bucket - " + FileBucket + " key - " + FileKey, flush=True)
 
@@ -451,7 +450,7 @@ while True:
                     print("[DEBUG] Processing BAM with samtools.", flush=True)
 
                     try:
-                        continue_and_delete = process_bam(UDN_ID, sequence_core_alias, FileBucket, FileKey, Sample_ID, upload_file_name, file_type, md5)
+                        continue_and_delete = process_bam(UDN_ID, FileBucket, FileKey, Sample_ID, upload_file_name, file_type, md5)
                     except:
                         print("Error processing BAM - ", sys.exc_info()[:2], flush=True)
                         continue_and_delete = False
@@ -463,7 +462,7 @@ while True:
 
                 elif file_type == "VCF" and continue_and_delete:
                     try:
-                        continue_and_delete = process_vcf(UDN_ID, sequence_core_alias, FileBucket, FileKey, Sample_ID, upload_file_name, file_type)
+                        continue_and_delete = process_vcf(UDN_ID, FileBucket, FileKey, Sample_ID, upload_file_name, file_type)
                     except:
                         print("[ERROR] Error processing VCF - ", sys.exc_info()[:2], flush=True)
                         continue_and_delete = False

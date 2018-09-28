@@ -42,8 +42,6 @@ queue.send_message(MessageBody='queue_file', \
                              'DataType': 'String'}, \
        'file_type': {'StringValue': '[VCF or BAM]', \
                      'DataType': 'String'}, \
-       'sequence_core_alias': {'StringValue': '[sequence --> sequencingcorealias.alias]', \
-                               'DataType': 'String'}, \
        'md5': {'StringValue': ' ', \
                'DataType': 'String'} \
    })
@@ -60,11 +58,6 @@ Helpful queries to get the above:
 
 `sequence = Sequence.objects.filter(patient__simpleid=file.exportlog.patient.simpleid)`
 
-`sequence_core_alias = SequenceCoreAlias.objects.filter(sequence=sequence.first()).first()`
-
-^ If that fails then:
-
-`sequence_core_alias = SequenceCoreAlias.objects.create(sequence=sequence.first(), alias='unknown')`
 
 And get the values by:
 
@@ -75,7 +68,5 @@ sample_id = `sequence.first().sampleid`
 FileKey = `'/'.join(file.file_url.split('/')[3:5])`
 
 file_service_uuid = `file.file_uuid`
-
-sequence_core_alias = `sequence_core_alias.alias`
 
 Give the EC2 instance some time to process the file and then look for it in the S3 under udn-files-test/ups-testing. You can monitor the ECS task's logs to see what it is doing.
