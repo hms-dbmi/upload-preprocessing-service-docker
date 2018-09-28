@@ -419,7 +419,9 @@ while True:
         )
     while len(messages) > 0:
         message_list.extend(messages)
-        messages = queue.receive_messages(MaxNumberOfMessages=10, MessageAttributeNames=['UDN_ID', 'FileBucket', 'FileKey', 'sample_ID', 'file_service_uuid', 'file_type', 'md5']):
+        messages = queue.receive_messages(
+            MaxNumberOfMessages=10, 
+            MessageAttributeNames=['UDN_ID', 'FileBucket', 'FileKey', 'sample_ID', 'file_service_uuid', 'file_type', 'md5'])
         print("Found Messages, processing.", flush=True)
 
     for message in message_list:
