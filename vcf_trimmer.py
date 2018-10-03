@@ -71,3 +71,7 @@ def trim(from_file, to_file, new_id):
 
             if result is not None:
                 f_output.write(result)
+    if not f_input.closed:
+        f_input.close()
+    if not f_output.closed:
+        f_output.close()
