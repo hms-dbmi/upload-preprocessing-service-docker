@@ -13,6 +13,7 @@ import xml.etree.ElementTree as ET
 import codecs
 import tarfile
 import pysam
+import uuid
 
 
 def silentremove(filename):
@@ -252,7 +253,8 @@ def upload_vcf_archive():
 
     return_value = True
 
-    upload_file_name = time.strftime('vcf_archive_%Y%m%d%H%M%S.tar')
+    # create a unique name for the archive
+    upload_file_name = 'vcf_archive_{}.tar'.format(uuid.uuid1())
     os.rename('/scratch/vcf_archive.tar', '/scratch/{}'.format(upload_file_name))
 
     # Do not upload to DbGap if testing
@@ -299,10 +301,11 @@ def process_vcf(UDN_ID, FileBucket, FileKey, Sample_ID, upload_file_name, file_t
 
     try:
         archive_size = os.path.getsize('/scratch/vcf_archive.tar')
+        print("Current archive size: {}".format(archive_size))
     except OSError:
         archive_size = 0
     vcf_size = os.path.getsize('/scratch/{}.gz'.format(upload_file_name))
-    if archive_size + vcf_size > 1024**4:  # 1TB
+    if archive_size + vcf_size > 250*1024**3:  # 250GB
         result = upload_vcf_archive()
         if not result:
             return_continue_and_delete = False
@@ -409,100 +412,96 @@ while True:
 
     print("Retrieving messages from queue - '" + currentQueue + "'", flush=True)
 
-    # get all messages from the queue 
-    # boto3 only allows retrieving 10 messages at a time so we'll load them all here first
-    # and then process the entire list of messages
+    # only grab one message at a time so multiple tasks can run simultaneously
 
-    message_list = []
     messages = queue.receive_messages(
-        MaxNumberOfMessages=10, 
+        MaxNumberOfMessages=1, 
         MessageAttributeNames=['UDN_ID', 'FileBucket', 'FileKey', 'sample_ID', 'file_service_uuid', 'file_type', 'md5']
         )
-    while len(messages) > 0:
-        message_list.extend(messages)
-        messages = queue.receive_messages(
-            MaxNumberOfMessages=10, 
-            MessageAttributeNames=['UDN_ID', 'FileBucket', 'FileKey', 'sample_ID', 'file_service_uuid', 'file_type', 'md5'])
+
     print("[DEBUG] found {} messages".format(len(message_list)))
-    for message in message_list:
-        continue_and_delete = True
+    if len(messages) == 0:
+        # upload won't do anything if there's no archive; this just sends the last archive if it hasn't been sent yet
+        upload_vcf_archive()
+    else:
+        for message in messages:
+            continue_and_delete = True
 
-        if message.message_attributes is not None:
-            UDN_ID = message.message_attributes.get('UDN_ID').get('StringValue')
-            FileBucket = message.message_attributes.get('FileBucket').get('StringValue')
-            FileKey = message.message_attributes.get('FileKey').get('StringValue')
-            Sample_ID = message.message_attributes.get('sample_ID').get('StringValue')
-            file_type = message.message_attributes.get('file_type').get('StringValue')
-            md5 = message.message_attributes.get('md5').get('StringValue')
+            if message.message_attributes is not None:
+                UDN_ID = message.message_attributes.get('UDN_ID').get('StringValue')
+                FileBucket = message.message_attributes.get('FileBucket').get('StringValue')
+                FileKey = message.message_attributes.get('FileKey').get('StringValue')
+                Sample_ID = message.message_attributes.get('sample_ID').get('StringValue')
+                file_type = message.message_attributes.get('file_type').get('StringValue')
+                md5 = message.message_attributes.get('md5').get('StringValue')
 
-            if file_type == 'BAM':
-                filename_extension = '.bam'
-            elif file_type == 'VCF':
-                filename_extension = '.vcf'
+                if file_type == 'BAM':
+                    filename_extension = '.bam'
+                elif file_type == 'VCF':
+                    filename_extension = '.vcf'
 
-            upload_file_name = "%s%s" % (message.message_attributes.get('file_service_uuid').get('StringValue'), filename_extension)
+                upload_file_name = "%s%s" % (message.message_attributes.get('file_service_uuid').get('StringValue'), filename_extension)
 
-            if UDN_ID and FileBucket and FileKey and Sample_ID and upload_file_name and file_type:
-                print("[DEBUG] Processing UDN_ID - " + UDN_ID + ".", flush=True)
-                print("[DEBUG] Downloading file. Bucket - " + FileBucket + " key - " + FileKey, flush=True)
+                if UDN_ID and FileBucket and FileKey and Sample_ID and upload_file_name and file_type:
+                    print("[DEBUG] Processing UDN_ID - " + UDN_ID + ".", flush=True)
+                    print("[DEBUG] Downloading file. Bucket - " + FileBucket + " key - " + FileKey, flush=True)
 
-                # Retrieve the file from S3.
-                try:
-                    tempFile = "/scratch/md5"
-                    retrieveBucket = s3.Bucket(FileBucket)
-                    retrieveBucket.download_file(FileKey, tempFile)
-                except botocore.exceptions.ClientError as e:
+                    # Retrieve the file from S3.
+                    try:
+                        tempFile = "/scratch/md5"
+                        retrieveBucket = s3.Bucket(FileBucket)
+                        retrieveBucket.download_file(FileKey, tempFile)
+                    except botocore.exceptions.ClientError as e:
+                        silentremove(tempFile)
+                        print("[ERROR] Error retrieving file from S3 - %s" % e, flush=True)
+                        continue_and_delete = False
+                        message.change_visibility(VisibilityTimeout=0)
+                        continue
+
+                    if file_type == "BAM" and continue_and_delete:
+                        
+
+                        print("[DEBUG] Processing BAM with samtools.", flush=True)
+
+                        try:
+                            continue_and_delete = process_bam(UDN_ID, FileBucket, FileKey, Sample_ID, upload_file_name, file_type, md5)
+                        except:
+                            print("Error processing BAM - ", sys.exc_info()[:2], flush=True)
+                            continue_and_delete = False
+                            message.change_visibility(VisibilityTimeout=0)
+                            continue
+                        finally:
+                            silentremove("/scratch/md5")
+                            silentremove("/scratch/header.sam")
+
+                    elif file_type == "VCF" and continue_and_delete:
+                        try:
+                            continue_and_delete = process_vcf(UDN_ID, FileBucket, FileKey, Sample_ID, upload_file_name, file_type)
+                        except:
+                            print("[ERROR] Error processing VCF - ", sys.exc_info()[:2], flush=True)
+                            continue_and_delete = False
+                            message.change_visibility(VisibilityTimeout=0)
+                            continue
+                        finally:
+                            silentremove("/scratch/md5")
+                            silentremove("/scratch/header.sam")
+
                     silentremove(tempFile)
-                    print("[ERROR] Error retrieving file from S3 - %s" % e, flush=True)
-                    continue_and_delete = False
+                    silentremove("/scratch/" + upload_file_name)
+
+                    # Let the queue know that the message is processed
+                    if continue_and_delete:
+                        print("[COMPLETE] {}|{}|{}|{}|{}|{}".format(UDN_ID, FileBucket, FileKey, Sample_ID, upload_file_name, file_type), flush=True)
+                        message.delete()
+                    else:
+                        message.change_visibility(VisibilityTimeout=0)
+
+
+                else:
+                    print("[ERROR] Message failed to provide all required attributes.", flush=True)
+                    print(message)
                     message.change_visibility(VisibilityTimeout=0)
                     continue
 
-                if file_type == "BAM" and continue_and_delete:
-                    
-
-                    print("[DEBUG] Processing BAM with samtools.", flush=True)
-
-                    try:
-                        continue_and_delete = process_bam(UDN_ID, FileBucket, FileKey, Sample_ID, upload_file_name, file_type, md5)
-                    except:
-                        print("Error processing BAM - ", sys.exc_info()[:2], flush=True)
-                        continue_and_delete = False
-                        message.change_visibility(VisibilityTimeout=0)
-                        continue
-                    finally:
-                        silentremove("/scratch/md5")
-                        silentremove("/scratch/header.sam")
-
-                elif file_type == "VCF" and continue_and_delete:
-                    try:
-                        continue_and_delete = process_vcf(UDN_ID, FileBucket, FileKey, Sample_ID, upload_file_name, file_type)
-                    except:
-                        print("[ERROR] Error processing VCF - ", sys.exc_info()[:2], flush=True)
-                        continue_and_delete = False
-                        message.change_visibility(VisibilityTimeout=0)
-                        continue
-                    finally:
-                        silentremove("/scratch/md5")
-                        silentremove("/scratch/header.sam")
-
-                silentremove(tempFile)
-                silentremove("/scratch/" + upload_file_name)
-
-                # Let the queue know that the message is processed
-                if continue_and_delete:
-                    print("[COMPLETE] {}|{}|{}|{}|{}|{}".format(UDN_ID, FileBucket, FileKey, Sample_ID, upload_file_name, file_type), flush=True)
-                    message.delete()
-                else:
-                    message.change_visibility(VisibilityTimeout=0)
-
-
-            else:
-                print("[ERROR] Message failed to provide all required attributes.", flush=True)
-                print(message)
-                message.change_visibility(VisibilityTimeout=0)
-                continue
-
-    upload_vcf_archive()
 
     time.sleep(10)
