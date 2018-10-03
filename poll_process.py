@@ -419,7 +419,7 @@ while True:
         MessageAttributeNames=['UDN_ID', 'FileBucket', 'FileKey', 'sample_ID', 'file_service_uuid', 'file_type', 'md5']
         )
 
-    print("[DEBUG] found {} messages".format(len(message_list)))
+    print("[DEBUG] found {} messages".format(len(messages)))
     if len(messages) == 0:
         # upload won't do anything if there's no archive; this just sends the last archive if it hasn't been sent yet
         upload_vcf_archive()
