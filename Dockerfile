@@ -15,6 +15,10 @@ RUN runuser -l aspera -c '/aspera/aspera-connect-3.6.2.117442-linux-64.sh'
 
 RUN python3 -m pip install boto3 requests pysam
 
+ADD samtools-1.3.1.tar.bz2 samtools.tar.bz2	
+RUN cd samtools.tar.bz2 && cd samtools-1.3.1 && make	
+ENV PATH /samtools.tar.bz2/samtools-1.3.1/:$PATH
+
 ENV AWS_CONFIG_FILE /.aws/config
 
 RUN mkdir /output/
