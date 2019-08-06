@@ -1,4 +1,5 @@
 import re
+import gzip
 
 # only these INFO annotations will be retained
 WHITELISTED_ANNOTATIONS = {
@@ -10,7 +11,8 @@ WHITELISTED_ANNOTATIONS = {
 
 
 def process_header(line, new_ids=None):
-    """Removes header lines that feature extraneous data (command lines, etc)
+    """
+    Removes header lines that feature extraneous data (command lines, etc)
     or INFO field annotations which are not whitelisted. Also replaces the
     sample IDs with the sequence of IDs in `new_ids`.
     """
@@ -41,7 +43,9 @@ def process_header(line, new_ids=None):
 
 
 def process_body(line):
-    """Retains only whitelisted INFO annotations in each record."""
+    """
+    Retains only whitelisted INFO annotations in each record.
+    """
 
     fields = line.split('\t')  # preserves newline
     infos = fields[7].split(';')
@@ -59,10 +63,22 @@ def process_body(line):
 
 
 def trim(from_file, to_file, new_id):
-    """Trims unwanted INFO annotations from a VCF file, including the header.
-    Also replaces sample ID."""
+    """
+    Trims unwanted INFO annotations from a VCF file, including the header.
+    Also replaces sample ID.
+    """
 
-    with open(from_file) as f_input, open(to_file, 'w') as f_output:
+    # need to test if the file has been zipped
+    with open(from_file) as f_test:
+        file_start = f.read(len(len("\x1f\x8b\x08")) # this should indicate if it's a gz file
+    f_test.close()
+    
+    if file_start == '\x1f\x8b\x08':
+        f_input = gzip.open(from_file)
+    else:
+        f_input = open(from_file) 
+
+    with open(to_file, 'w') as f_output:
         for line in f_input:
             if line.startswith('#'):
                 result = process_header(line, (new_id,))
