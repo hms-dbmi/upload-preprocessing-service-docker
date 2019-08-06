@@ -71,7 +71,8 @@ def trim(from_file, to_file, new_id):
     # need to test if the file has been zipped
     with open(from_file) as f_test:
         file_start = f.read(len(len("\x1f\x8b\x08")) # this should indicate if it's a gz file
-    f_test.close()
+    if not f_test.closed:
+        f_test.close()
     
     if file_start == '\x1f\x8b\x08':
         f_input = gzip.open(from_file)
