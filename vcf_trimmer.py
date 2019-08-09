@@ -1,5 +1,20 @@
 import re
 import gzip
+import logging
+import os
+
+if not os.path.exists('/scratch/log/ups.log'):
+    os.mknod('/scratch/log/ups.log')
+
+logger = logging.getLogger(__name__)
+
+file_handler = logging.FileHandler('/scratch/log/ups.log')
+formatter = logging.Formatter('%(asctime)s, %(name)s, %(levelname)s, %(message)s')
+file_handler.setFormatter(formatter)
+
+logger.addHandler(file_handler)
+logger.setLevel(logging.DEBUG)
+logger.debug('starting vcf trimmer')
 
 # only these INFO annotations will be retained
 WHITELISTED_ANNOTATIONS = {
@@ -68,27 +83,30 @@ def trim(from_file, to_file, new_id):
     Also replaces sample ID.
     """
 
-    # need to test if the file has been zipped
-    with open(from_file) as f_test:
-        file_start = f.read(len("\x1f\x8b\x08")) # this should indicate if it's a gz file
-    if not f_test.closed:
-        f_test.close()
+    logger.debug('vcf_trimmer starting trim on {}'.format(from_file))
     
-    if file_start == '\x1f\x8b\x08':
-        f_input = gzip.open(from_file)
-    else:
-        f_input = open(from_file) 
+    # need to test if the file has been zipped
+    # this is a bad way to do it but only solution found in python3
+    try:
+        f_input = open(from_file)
+        file_start = f_input.readline() 
+    except UnicodeDecodeError:
+        logger.debug('Unicode error')
+        f_input = gzip.open(from_file, 'rt')
+        file_start = f_input.readline()
+    finally:
+        logger.debug('file start is: {}'.format(file_start))
+        logger.debug('starting read of {}'.format(from_file))
+        with open(to_file, 'w') as f_output:
+            for line in f_input:
+                if line.startswith('#'):
+                    result = process_header(line, (new_id,))
+                else:
+                    result = process_body(line)
 
-    with open(to_file, 'w') as f_output:
-        for line in f_input:
-            if line.startswith('#'):
-                result = process_header(line, (new_id,))
-            else:
-                result = process_body(line)
-
-            if result is not None:
-                f_output.write(result)
-    if not f_input.closed:
-        f_input.close()
-    if not f_output.closed:
-        f_output.close()
+                if result is not None:
+                    f_output.write(result)
+        if not f_input.closed:
+            f_input.close()
+        if not f_output.closed:
+            f_output.close()

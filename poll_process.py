@@ -1,19 +1,47 @@
-import boto3
-import sys
-import hashlib
-import subprocess
 import os
-import json
-import botocore
-import errno
-from subprocess import call, check_output, CalledProcessError
-import time
-import vcf_trimmer
 import xml.etree.ElementTree as ET
 import codecs
 import tarfile
 import pysam
 import uuid
+import logging
+import boto3
+import sys
+import hashlib
+import json
+import botocore
+import errno
+from subprocess import call, check_output, CalledProcessError
+import time
+
+if not os.path.exists('/scratch/log'):
+    os.mkdir('/scratch/log')
+
+if not os.path.exists('/scratch/log/ups.log'):
+    os.mknod('/scratch/log/ups.log')
+
+if not os.path.exists('/scratch/log/file_audit.log'):
+    os.mknod('/scratch/log/file_audit.log')
+
+
+import vcf_trimmer
+
+formatter = logging.Formatter('%(asctime)s, %(name)s, %(levelname)s, %(message)s')
+
+file_handler = logging.FileHandler('/scratch/log/ups.log')
+file_handler.setFormatter(formatter)
+
+logger = logging.getLogger(__name__)
+logger.addHandler(file_handler)
+logger.setLevel(logging.DEBUG)
+logger.debug('starting to poll')
+
+audit_handler = logging.FileHandler('/scratch/log/file_audit.log')
+audit_handler.setFormatter(formatter)
+
+audit_logger = logging.getLogger('audit_log')
+audit_logger.addHandler(audit_handler)
+audit_logger.setLevel(logging.DEBUG)
 
 
 def silentremove(filename):
@@ -44,7 +72,7 @@ try:
     secret_response = secrets_client.get_secret_value(
         SecretId=secret_name
     )
-except ClientError as e:
+except botocore.exceptions.ClientError as e:
     if e.response['Error']['Code'] == 'ResourceNotFoundException':
         print("The requested secret " + secret_name + " was not found")
     elif e.response['Error']['Code'] == 'InvalidRequestException':
@@ -62,7 +90,7 @@ else:
 
 try: 
     aspera_key_secret = secrets_client.get_secret_value(SecretId='ups-prod-aspera-key')
-except ClientError as e:
+except botocore.exceptions.ClientError as e:
     if e.response['Error']['Code'] == 'ResourceNotFoundException':
         print("ups-prod-aspera-key not found")
     elif e.response['Error']['Code'] == 'InvalidRequestException':
@@ -83,7 +111,7 @@ else:
 
 try: 
     aspera_vcf_key_secret = secrets_client.get_secret_value(SecretId='ups-prod-aspera-vcf-key')
-except ClientError as e:
+except botocore.exceptions.ClientError as e:
     if e.response['Error']['Code'] == 'ResourceNotFoundException':
         print("ups-prod-aspera-key not found")
     elif e.response['Error']['Code'] == 'InvalidRequestException':
@@ -108,7 +136,7 @@ if secret['status'] == 'test':
     testing_bucket = 'udn-files-test'
     testing_folder = 'ups-testing'
 
-    print("[DEBUG] Starting up in TEST mode. All processed files will be uploaded to the " + testing_bucket + " bucket in S3 instead of being uploaded to dbgap.", flush=True)
+    print("[DEBUG] TEST mode. All files uploaded to {}".format(testing_bucket), flush=True)
 else:
     aspera_location_code = secret['aspera-location-code']
     aspera_pass = secret['aspera-pass']
@@ -124,7 +152,7 @@ sqs = boto3.resource('sqs')
 queue = sqs.get_queue_by_name(QueueName=currentQueue)
 
 
-def xmlIndent(elem, level=0):
+def xml_indent(elem, level=0):
     """
     sets proper indent on xml
     """
@@ -135,7 +163,7 @@ def xmlIndent(elem, level=0):
         if not elem.tail or not elem.tail.strip():
             elem.tail = i
         for elem in elem:
-            xmlIndent(elem, level+1)
+            xml_indent(elem, level + 1)
         if not elem.tail or not elem.tail.strip():
             elem.tail = i
     else:
@@ -143,16 +171,16 @@ def xmlIndent(elem, level=0):
             elem.tail = i
 
 
-def xmlToString(xml):
+def xml_to_string(xml):
     """
     properly formats XML as String
     """
     elem = xml.getroot()
-    xmlIndent(elem)
+    xml_indent(elem)
     return ET.tostring(elem, encoding="utf-8")
 
 
-def update_and_ship_XML(upload_file_name, md5):
+def update_and_ship_xml(upload_file_name, md5):
     """
     updates the run.xml file to include the MD5
     """
@@ -198,7 +226,7 @@ def update_and_ship_XML(upload_file_name, md5):
     xml_file.set("filename", upload_file_name)
     xml_file.set("filetype", 'bam')
 
-    run_xml = xmlToString(ET.ElementTree(root))
+    run_xml = xml_to_string(ET.ElementTree(root))
 
     run_file_handle = codecs.open(temp_run_file, "w", "utf-8")
     run_file_handle.write(codecs.decode(run_xml, "utf-8"))
@@ -280,24 +308,31 @@ def upload_vcf_archive():
 
 
 def process_vcf(UDN_ID, FileBucket, FileKey, Sample_ID, upload_file_name, file_type):
+    """
+    manage the processing of VCF files
+    """
 
     return_continue_and_delete = True
-
+    
     print("[DEBUG] Renaming File to " + upload_file_name, flush=True)
-
-    os.rename(tempFile, "/scratch/" + upload_file_name)
-
+    os.rename(tempFile, "/scratch/{}.bak".format(upload_file_name))
+    
     print("[DEBUG] Replacing sample_ID and removing extra VCF info", flush=True)
+    logger.debug('process_vcf - upload_file_name: {}'.format(upload_file_name))
 
-    os.rename('/scratch/{}'.format(upload_file_name), '/scratch/{}.bak'.format(upload_file_name))
     try:
         vcf_trimmer.trim('/scratch/{}.bak'.format(upload_file_name), '/scratch/{}'.format(upload_file_name), Sample_ID)
-    except:
+    except Exception as e:
         print("[DEBUG] Error trimming VCF annotations. {}|{}|{}|{}|{}|{}".format(UDN_ID, FileBucket, FileKey, Sample_ID, upload_file_name, file_type), flush=True)
+        logger.debug('process_vcf failed trim - {}'.format(e.message))
         os.rename('/scratch/{}.bak'.format(upload_file_name), '/scratch/{}'.format(upload_file_name))
 
     print("[DEBUG] Compressing and indexing VCF", flush=True)
-    pysam.tabix_index('/scratch/{}'.format(upload_file_name), preset='vcf')
+    pysam.tabix_index(
+        '/scratch/{}'.format(upload_file_name), 
+        preset='vcf', 
+        force=True
+        )
 
     try:
         archive_size = os.path.getsize('/scratch/vcf_archive.tar')
@@ -384,7 +419,7 @@ def process_bam(UDN_ID, FileBucket, FileKey, Sample_ID, upload_file_name, file_t
     md5 = md5_hash.hexdigest()
 
     # update the run.xml, archive all xml and send
-    xml_success = update_and_ship_XML(upload_file_name, md5)
+    xml_success = update_and_ship_xml(upload_file_name, md5)
     if not xml_success:
         return False
 
@@ -441,6 +476,7 @@ while True:
                     filename_extension = '.vcf'
 
                 upload_file_name = "%s%s" % (message.message_attributes.get('file_service_uuid').get('StringValue'), filename_extension)
+                logger.debug('upload_filename: {}'.format(upload_file_name))
 
                 if UDN_ID and FileBucket and FileKey and Sample_ID and upload_file_name and file_type:
                     print("[DEBUG] Processing UDN_ID - " + UDN_ID + ".", flush=True)
@@ -460,7 +496,6 @@ while True:
 
                     if file_type == "BAM" and continue_and_delete:
                         
-
                         print("[DEBUG] Processing BAM with samtools.", flush=True)
 
                         try:
@@ -476,9 +511,10 @@ while True:
 
                     elif file_type == "VCF" and continue_and_delete:
                         try:
+                            logger.debug('starting to process vcf')
                             continue_and_delete = process_vcf(UDN_ID, FileBucket, FileKey, Sample_ID, upload_file_name, file_type)
                         except:
-                            print("[ERROR] Error processing VCF - ", sys.exc_info()[:2], flush=True)
+                            print("[ERROR] Error processing VCF - {}".format(sys.exc_info()[:2]), flush=True)
                             continue_and_delete = False
                             message.change_visibility(VisibilityTimeout=0)
                             continue
@@ -492,6 +528,7 @@ while True:
                     # Let the queue know that the message is processed
                     if continue_and_delete:
                         print("[COMPLETE] {}|{}|{}|{}|{}|{}".format(UDN_ID, FileBucket, FileKey, Sample_ID, upload_file_name, file_type), flush=True)
+                        audit_logger.debug(FileKey)
                         message.delete()
                     else:
                         message.change_visibility(VisibilityTimeout=0)
