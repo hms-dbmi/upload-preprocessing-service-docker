@@ -11,6 +11,7 @@ import hashlib
 import json
 import botocore
 import errno
+import requests
 from subprocess import call, check_output, CalledProcessError
 import time
 
@@ -442,6 +443,26 @@ def process_bam(UDN_ID, FileBucket, FileKey, Sample_ID, upload_file_name, file_t
 
     return return_continue_and_delete
 
+def call_udngateway_mark_complete(id, logger):
+    """
+    Call the UDN Gateway API to mark the file as complete
+    """
+    try:
+        headers = {
+            'Content-Type': 'application/json',
+            'Authorization': 'Token {token}'.format(token=secret['udn_api_token'])
+        }
+
+        resp = requests.post(secret['udn_api_url'], data=json.dumps({'id': id}), headers=headers, verify=False, timeout=5)
+
+        if resp.status != 200:
+            error_message = "Failed to Mark File Complete: {}".format(id)
+            print(error_message, flush=True)
+            logger.debug(error_message)
+    except Exception as exc:
+        error_message = "Failed to Mark File Complete: {}".format(id)
+        print(error_message, flush=True)
+        logger.debug(error_message)
 
 while True:
 
@@ -463,6 +484,7 @@ while True:
             continue_and_delete = True
 
             if message.message_attributes is not None:
+                ExportFile_ID = message.message_attributes.get('ExportFile_ID').get('StringValue')
                 UDN_ID = message.message_attributes.get('UDN_ID').get('StringValue')
                 FileBucket = message.message_attributes.get('FileBucket').get('StringValue')
                 FileKey = message.message_attributes.get('FileKey').get('StringValue')
@@ -527,6 +549,8 @@ while True:
 
                     # Let the queue know that the message is processed
                     if continue_and_delete:
+                        call_udngateway_mark_complete(ExportFile_ID, audit_logger)
+
                         print("[COMPLETE] {}|{}|{}|{}|{}|{}".format(UDN_ID, FileBucket, FileKey, Sample_ID, upload_file_name, file_type), flush=True)
                         audit_logger.debug(FileKey)
                         message.delete()
