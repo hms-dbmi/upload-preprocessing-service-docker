@@ -35,9 +35,7 @@ def process_header(line, new_ids=None):
     # extraneous headers
     if line.startswith('##') and not any(
             line.startswith('##' + header_type)
-            for header_type in (
-                'fileformat', 'INFO', 'FILTER', 'FORMAT', 'ALT', 'contig'
-            )
+            for header_type in ('INFO', 'FILTER', 'FORMAT', 'ALT', 'contig')
     ):
         return None
 
