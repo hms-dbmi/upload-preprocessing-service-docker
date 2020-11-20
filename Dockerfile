@@ -1,5 +1,8 @@
 FROM ubuntu
 
+ENV TZ=America/New_York
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
 RUN apt-get update && apt-get install -y gcc make bzip2 zlib1g-dev ncurses-dev libbz2-dev liblzma-dev
 RUN apt-get update && apt-get install -y python3
 RUN apt-get update && apt-get install -y python3-pip
