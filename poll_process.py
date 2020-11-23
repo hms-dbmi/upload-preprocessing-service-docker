@@ -472,7 +472,7 @@ while True:
 
     messages = queue.receive_messages(
         MaxNumberOfMessages=1, 
-        MessageAttributeNames=['UDN_ID', 'FileBucket', 'FileKey', 'sample_ID', 'file_service_uuid', 'file_type', 'md5']
+        MessageAttributeNames=['ExportFile_ID', 'UDN_ID', 'FileBucket', 'FileKey', 'sample_ID', 'file_service_uuid', 'file_type', 'md5']
         )
 
     print("[DEBUG] found {} messages".format(len(messages)))
