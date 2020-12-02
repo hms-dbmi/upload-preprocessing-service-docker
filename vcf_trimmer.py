@@ -1,5 +1,5 @@
 import re
-import gzip
+import altgzip
 import logging
 import os
 
@@ -90,8 +90,8 @@ def trim(from_file, to_file, new_id):
         file_start = f_input.readline() 
     except UnicodeDecodeError:
         logger.debug('Unicode error')
-        f_input = gzip.open(from_file, 'rt')
-        file_start = f_input.readline()
+        f_input = altgzip.AltGzipFile(from_file)
+        file_start = f_input.read()
     finally:
         logger.debug('file start is: {}'.format(file_start))
         logger.debug('starting read of {}'.format(from_file))
