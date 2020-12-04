@@ -31,6 +31,5 @@ COPY config /.aws/config
 
 COPY poll_process.py /output/poll_process.py
 COPY vcf_trimmer.py /output/vcf_trimmer.py
-COPY altgzip.py /output/altgzip.py
 
 CMD ["python3","/output/poll_process.py"]

@@ -455,7 +455,11 @@ def call_udngateway_mark_complete(id, logger):
 
         resp = requests.post(secret['udn_api_url'], data=json.dumps({'id': id}), headers=headers, verify=False, timeout=5)
 
-        if resp.status != 200:
+        if resp.status_code == 200:
+            success_message = "Marked File Complete: {}".format(id)
+            print(success_message, flush=True)
+            logger.debug(success_message)
+        else:
             error_message = "Failed to Mark File Complete: {}".format(id)
             print(error_message, flush=True)
             logger.debug(error_message)
