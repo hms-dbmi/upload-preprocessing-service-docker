@@ -1,14 +1,16 @@
 """
 Utilities for processing VCF files
 """
-import re
 import gzip
 import logging
 import os
 import pysam
+import re
+import sys
 import tarfile
-
-from .utilities import upload_vcf_archive
+import uuid
+from subprocess import check_output
+from .aws import get_s3_client
 
 LOGGER = logging.getLogger('ups')
 
@@ -27,7 +29,6 @@ def process_header(line, new_ids=None):
     or INFO field annotations which are not whitelisted. Also replaces the
     sample IDs with the sequence of IDs in `new_ids`.
     """
-
     # extraneous headers
     if line.startswith('##') and not any(
             line.startswith('##' + header_type)
@@ -111,9 +112,7 @@ def process_vcf(udn_id, file_bucket, file_key, sample_id, upload_file_name, file
     """
     manage the processing of VCF files
     """
-    return_continue_and_delete = True
-
-    print("[DEBUG] Renaming File to " + upload_file_name, flush=True)
+    print("[DEBUG] Renaming File to {}".format(upload_file_name), flush=True)
     os.rename(temp_file, "/scratch/{}.bak".format(upload_file_name))
 
     print("[DEBUG] Replacing sample_id and removing extra VCF info", flush=True)
@@ -128,21 +127,10 @@ def process_vcf(udn_id, file_bucket, file_key, sample_id, upload_file_name, file
         LOGGER.debug('process_vcf failed trim - {}'.format(exc))
         os.rename('/scratch/{}.bak'.format(upload_file_name), '/scratch/{}'.format(upload_file_name))
 
+        return False
+
     print("[DEBUG] Compressing and indexing VCF", flush=True)
     pysam.tabix_index('/scratch/{}'.format(upload_file_name), preset='vcf', force=True)
-
-    try:
-        archive_size = os.path.getsize('/scratch/vcf_archive.tar')
-        print("Current archive size: {}".format(archive_size))
-    except OSError:
-        archive_size = 0
-
-    vcf_size = os.path.getsize('/scratch/{}.gz'.format(upload_file_name))
-
-    if archive_size + vcf_size > 250*1024**3:  # 250GB
-        result = upload_vcf_archive()
-        if not result:
-            return_continue_and_delete = False
 
     with tarfile.TarFile('/scratch/vcf_archive.tar', 'a') as archive:
         print("[DEBUG] adding {} to archive".format(upload_file_name))
@@ -150,4 +138,32 @@ def process_vcf(udn_id, file_bucket, file_key, sample_id, upload_file_name, file
             archive.add('/scratch/{}'.format(name), arcname=name)
             os.remove('/scratch/{}'.format(name))
 
-    return return_continue_and_delete
+    return True
+
+
+def upload_vcf_archive(aspera_vcf_location_code, testing=False, testing_bucket=None, testing_folder=None):
+    if not os.path.exists('/scratch/vcf_archive.tar'):
+        return
+
+    upload_file_name = 'vcf_archive_{}.tar'.format(uuid.uuid1())
+    os.rename('/scratch/vcf_archive.tar', '/scratch/{}'.format(upload_file_name))
+
+    # Do not upload to DbGap if testing
+    if testing:
+        s3_filename = testing_folder + '/' + upload_file_name
+        print("[DEBUG] Attempting to copy file " + upload_file_name +
+              " to S3 bucket for storage under " + s3_filename + ".", flush=True)
+        testing_s3 = get_s3_client()
+        testing_s3.meta.client.upload_file(
+            '/scratch/' + upload_file_name, testing_bucket, s3_filename)
+    else:
+        try:
+            upload_location = "subasp@upload.ncbi.nlm.nih.gov:uploads/upload_requests/{}/".format(
+                aspera_vcf_location_code)
+            print("[DEBUG] Attempting to upload file {} via Aspera to {}".format(
+                upload_file_name, upload_location), flush=True)
+            upload_output = check_output(
+                ["/home/aspera/.aspera/connect/bin/ascp --file-crypt=encrypt -i /aspera/aspera_vcf.pk /scratch/" + upload_file_name + " " + upload_location], shell=True)
+            print(upload_output, flush=True)
+        except:
+            print("[ERROR] Error sending files via Aspera - ", sys.exc_info()[:2], flush=True)

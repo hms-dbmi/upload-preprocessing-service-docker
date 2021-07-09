@@ -7,8 +7,8 @@ from subprocess import check_output
 from .aws import get_queue_by_name, get_s3_client, get_secret_from_secretes_manager, write_aspera_secrets_to_disk
 from .bams import process_bam
 from .udn_gateway import call_udngateway_mark_complete
-from .utilities import setup_logger, silent_remove, upload_vcf_archive
-from .vcfs import process_vcf
+from .utilities import setup_logger, silent_remove
+from .vcfs import process_vcf, upload_vcf_archive
 from .xml_utils import create_and_tar_xml
 
 LOGGER = setup_logger('ups')
@@ -39,7 +39,7 @@ S3_CLIENT = get_s3_client()
 LOGGER.debug('starting to poll')
 
 while True:
-    print("Retrieving messages from queue - '" + QUEUE_NAME + "'", flush=True)
+    print("Retrieving messages from queue - '{}'".format(QUEUE_NAME), flush=True)
 
     messages = SQS_QUEUE.receive_messages(MaxNumberOfMessages=1, MessageAttributeNames=[
         'ExportFile_ID', 'UDN_ID', 'FileBucket', 'FileKey', 'sample_ID', 'file_service_uuid', 'file_type', 'md5'])
@@ -47,7 +47,7 @@ while True:
     print("[DEBUG] found {} messages".format(len(messages)))
 
     if len(messages) == 0:
-        upload_vcf_archive()
+        upload_vcf_archive(ASPERA_VCF_LOCATION_CODE, TESTING, TESTING_BUCKET, TESTING_FOLDER)
     else:
         for message in messages:
             continue_and_delete = True
@@ -75,8 +75,8 @@ while True:
 
                 if (dna_source and exportfile_id and file_bucket and file_key and file_type and fileservice_uuid and
                         instrument_model and read_lengths and sample_id and sequence_type and udn_id and upload_file_name):
-                    print("[DEBUG] Processing UDN_ID - " + udn_id + ".", flush=True)
-                    print("[DEBUG] Downloading file. Bucket - " + file_bucket + " key - " + file_key, flush=True)
+                    print("[DEBUG] Processing UDN_ID - {}.".format(udn_id), flush=True)
+                    print("[DEBUG] Downloading file. Bucket - {} key - {}".format(file_bucket, file_key), flush=True)
 
                     try:
                         temp_file = "/scratch/md5"
@@ -102,8 +102,8 @@ while True:
                                 bam_file_path = os.path.join(TESTING_FOLDER, upload_file_name)
                                 xml_tar_path = os.path.join(TESTING_FOLDER, tar_file_name)
 
-                                print("[DEBUG] Attempting to copy files (bam and xml tar) for " + upload_file_name +
-                                      " to S3 bucket for storage under " + TESTING_FOLDER + ".", flush=True)
+                                print("[DEBUG] Attempting to copy files (bam and xml tar) for {} to S3 bucket for storage under {}".format(
+                                    upload_file_name, TESTING_FOLDER), flush=True)
                                 testing_s3 = get_s3_client()
                                 testing_s3.meta.client.upload_file(
                                     os.path.join("/scratch", upload_file_name), TESTING_BUCKET, bam_file_path)
@@ -111,14 +111,14 @@ while True:
                                     os.path.join("/scratch", tar_file_name), TESTING_BUCKET, tar_file_name)
                             else:
                                 try:
-                                    print("[DEBUG] Attempting to upload file " + upload_file_name +
-                                          " via Aspera - asp-hms-cc@gap-submit.ncbi.nlm.nih.gov:" + ASPERA_LOCATION_CODE, flush=True)
+                                    print("[DEBUG] Attempting to upload file {} via Aspera - asp-hms-cc@gap-submit.ncbi.nlm.nih.gov:{}".format(
+                                        upload_file_name, ASPERA_LOCATION_CODE), flush=True)
                                     upload_output = check_output(["/home/aspera/.aspera/connect/bin/ascp -i /aspera/aspera.pk -Q -l 5000m -k 1 /scratch/" +
                                                                   upload_file_name + " asp-hms-cc@gap-submit.ncbi.nlm.nih.gov:" + ASPERA_LOCATION_CODE], shell=True)
                                     print(upload_output, flush=True)
 
-                                    print("[DEBUG] Attempting to upload file " + tar_file_name +
-                                          " via Aspera - asp-hms-cc@gap-submit.ncbi.nlm.nih.gov:" + ASPERA_LOCATION_CODE, flush=True)
+                                    print("[DEBUG] Attempting to upload file {} via Aspera - asp-hms-cc@gap-submit.ncbi.nlm.nih.gov:{}".format(
+                                        tar_file_name, ASPERA_LOCATION_CODE), flush=True)
                                     upload_output = check_output(["/home/aspera/.aspera/connect/bin/ascp -i /aspera/aspera.pk -Q -l 5000m -k 1 " +
                                                                   tar_file_name + " asp-hms-cc@gap-submit.ncbi.nlm.nih.gov:" + ASPERA_LOCATION_CODE], shell=True)
                                     print(upload_output, flush=True)
@@ -140,6 +140,15 @@ while True:
                             LOGGER.debug('starting to process vcf')
                             continue_and_delete = process_vcf(
                                 udn_id, file_bucket, file_key, sample_id, upload_file_name, file_type, temp_file)
+
+                            try:
+                                archive_size = os.path.getsize('/scratch/vcf_archive.tar')
+                                print("Current archive size: {}".format(archive_size))
+                            except OSError:
+                                archive_size = 0
+
+                            if archive_size > 250*1024**3:  # 250GB
+                                upload_vcf_archive(ASPERA_VCF_LOCATION_CODE, TESTING, TESTING_BUCKET, TESTING_FOLDER)
                         except:
                             print("[ERROR] Error processing VCF - {}".format(sys.exc_info()[:2]), flush=True)
                             continue_and_delete = False

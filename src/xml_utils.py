@@ -282,7 +282,7 @@ def format_submission_xml(library):
 
 def create_and_tar_xml(dna_source, fileservice_uuid, instrument_model, md5_checksum, read_lengths, sample_id, sequence_type, upload_file_name):
     """
-    Creates the XML files for the BAM file and 
+    Creates the XML files for the BAM file and
     """
     temp_experiment_file = '/scratch/experiment.xml'
     temp_run_file = "/scratch/run.xml"
@@ -326,11 +326,11 @@ def create_and_tar_xml(dna_source, fileservice_uuid, instrument_model, md5_check
     tar = tarfile.open(tar_file_name, "w")
 
     for name in ['/scratch/experiment.xml', '/scratch/run.xml', '/scratch/submission.xml']:
-        print("[DEBUG] Adding " + name + " to tar file")
+        print("[DEBUG] Adding {} to tar file".format(name))
         try:
             tar.add(name)
         except:
-            print("[DEBUG] Error adding " + name + " to tar file")
+            print("[DEBUG] Error adding {} to tar file".format(name))
 
     tar.close()
 

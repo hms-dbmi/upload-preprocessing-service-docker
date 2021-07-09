@@ -47,7 +47,7 @@ def process_bam(udn_id, file_bucket, file_key, sample_id, upload_file_name, file
                 upload_file_name, file_type
             ), flush=True)
 
-    os.rename('/scratch/md5_reheader', '/scratch/' + upload_file_name)
+    os.rename('/scratch/md5_reheader', os.path.join('/scratch', upload_file_name))
     print("[DEBUG] Done processing file. Verify MD5 if present.", flush=True)
 
     # bams are usually very big so stream instead of reading it all into memory
