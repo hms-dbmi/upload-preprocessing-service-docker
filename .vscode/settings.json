@@ -1,0 +1,24 @@
+{
+    "python.linting.enabled": true,
+    "python.linting.pylintEnabled": true,
+    "python.linting.pylintPath": "${workspaceRoot}/venv/bin/pylint",
+    "python.linting.lintOnSave": true,
+    "python.formatting.autopep8Path": "${workspaceRoot}/venv/bin/autopep8",
+    "python.envFile": "${workspaceRoot}/.env",
+    "python.pythonPath": "venv/bin/python3",
+    "python.autoComplete.extraPaths": [
+        "${workspaceRoot}/src",
+        "${workspaceRoot}/venv/lib/python3.8/site-packages",
+        "/usr/bin/python3",
+        "~/Library/Python/3.8/lib/python/site-packages"
+    ],
+    "python.formatting.autopep8Args": [
+        "--max-line-length=120"
+    ],
+    "python.analysis.extraPaths": [
+        "${workspaceRoot}/src",
+        "${workspaceRoot}/venv/lib/python3.8/site-packages",
+        "/usr/bin/python3",
+        "~/Library/Python/3.8/lib/python/site-packages"
+    ],
+}
