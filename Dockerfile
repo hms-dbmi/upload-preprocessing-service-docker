@@ -29,7 +29,12 @@ RUN mkdir /output/
 RUN mkdir /.aws/
 COPY config /.aws/config
 
-COPY poll_process.py /output/poll_process.py
-COPY vcf_trimmer.py /output/vcf_trimmer.py
+COPY src/aws.py /output/aws.py
+COPY src/bam.py /output/bam.py
+COPY src/udn_gateway.py /output/udn_gateway.py
+COPY src/poll_process.py /output/poll_process.py
+COPY src/utilities.py /output/utilities.py
+COPY src/vcfs.py /output/vcfs.py
+COPY src/xml_utils.py /output/xml_utils.py
 
 CMD ["python3","/output/poll_process.py"]

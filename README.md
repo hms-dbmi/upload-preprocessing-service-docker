@@ -11,6 +11,10 @@ This repo contains a docker container that will process VCF and BAM files to sen
 
 `docker push 646975045128.dkr.ecr.us-east-1.amazonaws.com/ups:latest`
 
+## Local Dev
+1) Create a Virtual Environment with `python3 -m venv venv`
+2) Install necessary libraries with `python3 -m pip install autopep8 boto3 requests pylint pysam`
+
 ## Testing
 If in testing mode, you can fire messages off to SQS to have the UPS docker process a real production file and save it in S3 for inspection.
 
