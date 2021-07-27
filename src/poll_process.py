@@ -42,7 +42,8 @@ while True:
     print("Retrieving messages from queue - '{}'".format(QUEUE_NAME), flush=True)
 
     messages = SQS_QUEUE.receive_messages(MaxNumberOfMessages=1, MessageAttributeNames=[
-        'ExportFile_ID', 'UDN_ID', 'FileBucket', 'FileKey', 'sample_ID', 'file_service_uuid', 'file_type', 'md5'])
+        'dna_source', 'exportfile_id', 'file_type', 'file_url', 'fileservice_uuid', 'instrument_model',
+        'read_lengths', 'sample_id', 'sequence_type', 'udn_id'])
 
     print("[DEBUG] found {} messages".format(len(messages)))
 
@@ -55,12 +56,11 @@ while True:
             if message.message_attributes is not None:
                 dna_source = message.message_attributes.get('dna_source').get('StringValue')
                 exportfile_id = message.message_attributes.get('exportfile_id').get('StringValue')
-                file_bucket = message.message_attributes.get('file_bucket').get('StringValue')
-                file_key = message.message_attributes.get('file_key').get('StringValue')
                 file_type = message.message_attributes.get('file_type').get('StringValue')
+                file_url = message.message_attributes.get('file_url').get('StringValue')
                 fileservice_uuid = message.message_attributes.get('fileservice_uuid').get('StringValue')
                 instrument_model = message.message_attributes.get('instrument_model').get('StringValue')
-                read_lengths = message.message_attributes.get('read_engths').get('StringValue')
+                read_lengths = message.message_attributes.get('read_lengths').get('StringValue')
                 sample_id = message.message_attributes.get('sample_id').get('StringValue')
                 sequence_type = message.message_attributes.get('sequence_type').get('StringValue')
                 udn_id = message.message_attributes.get('udn_id').get('StringValue')
@@ -70,11 +70,16 @@ while True:
                 elif file_type == 'VCF':
                     filename_extension = '.vcf'
 
+                file_url_pieces = file_url.split('/')
+                file_bucket = file_url_pieces[2]
+                file_key = '/'.join(file_url_pieces[3:])
+
                 upload_file_name = "%s%s" % (fileservice_uuid, filename_extension)
                 LOGGER.debug('upload_filename: {}'.format(upload_file_name))
 
-                if (dna_source and exportfile_id and file_bucket and file_key and file_type and fileservice_uuid and
-                        instrument_model and read_lengths and sample_id and sequence_type and udn_id and upload_file_name):
+                if (dna_source and exportfile_id and file_type and file_url and fileservice_uuid and
+                        instrument_model and read_lengths and sample_id and sequence_type and udn_id and
+                        file_bucket and file_key and upload_file_name):
                     print("[DEBUG] Processing UDN_ID - {}.".format(udn_id), flush=True)
                     print("[DEBUG] Downloading file. Bucket - {} key - {}".format(file_bucket, file_key), flush=True)
 
