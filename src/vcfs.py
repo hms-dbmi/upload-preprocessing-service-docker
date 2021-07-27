@@ -10,7 +10,7 @@ import sys
 import tarfile
 import uuid
 from subprocess import check_output
-from .aws import get_s3_client
+from aws_utils import get_s3_client
 
 LOGGER = logging.getLogger('ups')
 

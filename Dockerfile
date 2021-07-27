@@ -29,7 +29,7 @@ RUN mkdir /output/
 RUN mkdir /.aws/
 COPY config /.aws/config
 
-COPY src/aws.py /output/aws.py
+COPY src/aws_utils.py /output/aws_utils.py
 COPY src/bams.py /output/bams.py
 COPY src/poll_process.py /output/poll_process.py
 COPY src/udn_gateway.py /output/udn_gateway.py

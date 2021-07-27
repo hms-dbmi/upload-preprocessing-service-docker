@@ -8,7 +8,7 @@ import sys
 import tarfile
 import xml.etree.ElementTree as ET
 from subprocess import call
-from .utilities import silent_remove
+from utilities import silent_remove
 
 LOGGER = logging.getLogger('ups')
 

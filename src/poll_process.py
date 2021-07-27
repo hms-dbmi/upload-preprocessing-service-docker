@@ -4,12 +4,12 @@ import botocore
 import time
 from subprocess import check_output
 
-from .aws import get_queue_by_name, get_s3_client, get_secret_from_secretes_manager, write_aspera_secrets_to_disk
-from .bams import process_bam
-from .udn_gateway import call_udngateway_mark_complete
-from .utilities import setup_logger, silent_remove
-from .vcfs import process_vcf, upload_vcf_archive
-from .xml_utils import create_and_tar_xml
+from aws_utils import get_queue_by_name, get_s3_client, get_secret_from_secretes_manager, write_aspera_secrets_to_disk
+from bams import process_bam
+from udn_gateway import call_udngateway_mark_complete
+from utilities import setup_logger, silent_remove
+from vcfs import process_vcf, upload_vcf_archive
+from xml_utils import create_and_tar_xml
 
 LOGGER = setup_logger('ups')
 AUDIT_LOGGER = setup_logger('file_audit')
