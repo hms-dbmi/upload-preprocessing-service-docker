@@ -141,7 +141,7 @@ def process_vcf(udn_id, file_bucket, file_key, sample_id, upload_file_name, file
     return True
 
 
-def upload_vcf_archive(aspera_vcf_location_code, testing=False, testing_bucket=None, testing_folder=None):
+def upload_vcf_archive(aspera_vcf_location_code, testing, testing_bucket, testing_folder):
     if not os.path.exists('/scratch/vcf_archive.tar'):
         return
 

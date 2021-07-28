@@ -29,7 +29,12 @@ You will need to ensure that the spreadsheets have been uploaded prior to submit
 * Ensure you have 1 or more running ECS tasks (see: [Starting ECS Tasks](#starting-ecs-tasks))
 * Schedule the VCFs files using the job on the `Export Tasks` page in Super Admin
 * While the files are being processed you can monitor the queue (see: [Viewing the UPS SQS Queue](#viewing-the-ups-sqs-queue)) and view the logs (see: [Viewing the UPS Logs](#viewing-the-ups-logs)) to track progress
-* Once all VCF files have been uploaded return to the NIH site to click the `Complete` button. __Note:__ When you created your request you were given a deadline. Be sure you can upload all VCFs and click the `Complete` button prior to that date or you will need to start over.
+* Once all VCF files have been uploaded return to the NIH site and check to ensure the archive files are listed. There will be a `Click here to view` link nested in where you retrieved the Aspera information. Click there and make sure all archive files you expect to see are listed as uploaded.
+   ![image](./docs/vcf_archive_upload_progress.png)
+* When all files are present you must choose `Molecular Data` from the dropdown below the `Complete` button (it will look like it isn't part of the flow but it is). Then click the `Complete` button. This will gray over the screen and process the files. Wait for that to complete.
+* Once that is done you will be able to see your VCF archive files at the bottom of the file list and be able to click the `Submit` button and only then are the VCFs complete. __Note:__ When you created your request you were given a deadline. Be sure you can upload all VCFs and click the `Complete` and `Submit` buttons prior to that date or you will need to start over.
+* Clicking submit will take you to a screen that shows you the files that were submitted for one final check.
+   ![image](./docs/vcf_archive_upload_complete.png)
 
 ## Uploading BAM Files to dbGaP
 You will need to ensure the spreadsheets have been QA'd and approved prior to submitting BAM files.
@@ -42,7 +47,13 @@ You will need to ensure the spreadsheets have been QA'd and approved prior to su
 * TODO [Old Jira](https://hms-dbmi.atlassian.net/wiki/spaces/UDN/pages/74383364/UPS+Setup)
 
 ## Starting ECS Tasks
-* TODO
+* Go to the UPS-Prod clister in the AWS ECS console and click `Run new Task`.
+   ![image](./ecs_task_creation.png)
+* Choose `EC2` as your `Launch type`.
+* Choose the `UPS-PROD-task_family` as your `Task Definition - Family`
+* Choose the number of tasks to match the number of instances you have. Typically 2 or 3 instances/tasks should be sufficient for a dbGaP run of a couple hundred files.
+* Type `UPS-PROD` as your `Task Group`
+* Hit `Run Task` to kick off the tasks, you will then see the tasks listed under `Tasks` tab
 
 ## Viewing the UPS SQS Queue
 * TODO
