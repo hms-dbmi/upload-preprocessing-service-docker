@@ -26,6 +26,8 @@ if SECRET['status'] == 'test':
     print("[DEBUG] TEST mode. All files uploaded to {}".format(TESTING_BUCKET), flush=True)
 else:
     TESTING = False
+    TESTING_BUCKET = None
+    TESTING_FOLDER = None
     ASPERA_LOCATION_CODE = SECRET['aspera-location-code']
     ASPERA_PASS = SECRET['aspera-pass']
     ASPERA_VCF_LOCATION_CODE = SECRET['aspera-location-code-vcf']
