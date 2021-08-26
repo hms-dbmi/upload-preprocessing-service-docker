@@ -284,28 +284,39 @@ def create_and_tar_xml(dna_source, fileservice_uuid, instrument_model, md5_check
     """
     Creates the XML files for the BAM file and
     """
+    print("[DEBUG] Begin creation of XML files for {}".format(upload_file_name), flush=True)
+
     temp_experiment_file = '/scratch/experiment.xml'
     temp_run_file = "/scratch/run.xml"
     temp_submission_file = '/scratch/submission.xml'
 
-    library = create_xml_library(dna_source, fileservice_uuid, instrument_model, md5_checksum,
-                                 read_lengths, sample_id, sequence_type, upload_file_name)
+    try:
+        library = create_xml_library(
+            dna_source, fileservice_uuid, instrument_model, md5_checksum, read_lengths, sample_id,
+            sequence_type, upload_file_name)
 
-    experiment_xml = xml_to_string(format_experiment_xml(library))
-    run_xml = xml_to_string(format_run_xml(library))
-    submission_xml = xml_to_string(format_submission_xml(library))
+        experiment_xml = xml_to_string(format_experiment_xml(library))
+        run_xml = xml_to_string(format_run_xml(library))
+        submission_xml = xml_to_string(format_submission_xml(library))
 
-    experiment_file_handle = codecs.open(temp_experiment_file, "w", "utf-8")
-    experiment_file_handle.write(codecs.decode(experiment_xml, "utf-8"))
-    experiment_file_handle.close()
+        experiment_file_handle = codecs.open(temp_experiment_file, "w", "utf-8")
+        experiment_file_handle.write(codecs.decode(experiment_xml, "utf-8"))
+        experiment_file_handle.close()
 
-    run_file_handle = codecs.open(temp_run_file, "w", "utf-8")
-    run_file_handle.write(codecs.decode(run_xml, "utf-8"))
-    run_file_handle.close()
+        run_file_handle = codecs.open(temp_run_file, "w", "utf-8")
+        run_file_handle.write(codecs.decode(run_xml, "utf-8"))
+        run_file_handle.close()
 
-    submission_file_handle = codecs.open(temp_submission_file, "w", "utf-8")
-    submission_file_handle.write(codecs.decode(submission_xml, "utf-8"))
-    submission_file_handle.close()
+        submission_file_handle = codecs.open(temp_submission_file, "w", "utf-8")
+        submission_file_handle.write(codecs.decode(submission_xml, "utf-8"))
+        submission_file_handle.close()
+    except Exception as exc:
+        error_message = "[DEBUG] ERROR - Failed creation of XML files for {} with error {}".format(
+            upload_file_name, exc)
+        print(error_message, flush=True)
+        raise Exception(error_message)
+
+    print("[DEBUG] XML files created for {}, beginning validation".format(upload_file_name), flush=True)
 
     exp_result = call(
         'xmllint --schema http://www.ncbi.nlm.nih.gov/viewvc/v1/trunk/sra/doc/SRA/SRA.experiment.xsd?view=co /scratch/experiment.xml > /dev/null', shell=True)
