@@ -64,7 +64,7 @@ while True:
                 instrument_model = message.message_attributes.get('instrument_model').get('StringValue')
                 read_lengths = message.message_attributes.get('read_lengths').get('StringValue')
                 sample_id = message.message_attributes.get('sample_id').get('StringValue')
-                sequence_type = message.message_attributes.get('sequence_type').get('StringValue')
+                sequence_type = int(message.message_attributes.get('sequence_type').get('StringValue'))
                 udn_id = message.message_attributes.get('udn_id').get('StringValue')
 
                 if file_type == 'BAM':
