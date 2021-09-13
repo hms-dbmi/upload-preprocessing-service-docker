@@ -2,7 +2,6 @@
 Utilities for processing VCF files
 """
 import gzip
-import logging
 import os
 import pysam
 import re
@@ -11,8 +10,7 @@ import tarfile
 import uuid
 from subprocess import check_output
 from aws_utils import get_s3_client
-
-LOGGER = logging.getLogger('ups')
+from utilities import write_to_logs
 
 # only these INFO annotations will be retained
 WHITELISTED_ANNOTATIONS = {
@@ -43,7 +41,6 @@ def process_header(line, new_ids=None):
         if info_name not in WHITELISTED_ANNOTATIONS:
             return None
 
-    # update sample IDs
     if line.startswith('#CHROM') and new_ids is not None:
         fields = line.strip().split('\t')[:9]  # fixed headers
         fields.extend(new_ids)
@@ -56,7 +53,6 @@ def process_body(line):
     """
     Retains only whitelisted INFO annotations in each record.
     """
-
     fields = line.split('\t')  # preserves newline
     infos = fields[7].split(';')
 
@@ -77,21 +73,11 @@ def trim_vcf(from_file, to_file, new_id):
     Trims unwanted INFO annotations from a VCF file, including the header.
     Also replaces sample ID.
     """
-    LOGGER.debug('vcf_trimmer starting trim on {}'.format(from_file))
-
-    # need to test if the file has been zipped
-    # this is a bad way to do it but only solution found in python3
     try:
         f_input = open(from_file)
-        file_start = f_input.readline()
     except UnicodeDecodeError:
-        LOGGER.debug('Unicode error')
         f_input = gzip.open(from_file, 'rt')
-        file_start = f_input.readline()
     finally:
-        LOGGER.debug('file start is: {}'.format(file_start))
-        LOGGER.debug('starting read of {}'.format(from_file))
-
         with open(to_file, 'w') as f_output:
             for line in f_input:
                 if line.startswith('#'):
@@ -108,32 +94,29 @@ def trim_vcf(from_file, to_file, new_id):
             f_output.close()
 
 
-def process_vcf(udn_id, file_bucket, file_key, sample_id, upload_file_name, file_type, temp_file):
+def process_vcf(sample_id, upload_file_name, temp_file, logger):
     """
     manage the processing of VCF files
     """
-    print("[DEBUG] Renaming File to {}".format(upload_file_name), flush=True)
+    write_to_logs("Step 2 - Processing File: Renaming VCF file to {}".format(upload_file_name))
     os.rename(temp_file, "/scratch/{}.bak".format(upload_file_name))
 
-    print("[DEBUG] Replacing sample_id and removing extra VCF info", flush=True)
-    LOGGER.debug('process_vcf - upload_file_name: {}'.format(upload_file_name))
-
     try:
+        write_to_logs(
+            "Step 2 - Processing File: Replacing sample_id and removing extra info for VCF file {}".format(upload_file_name))
         trim_vcf('/scratch/{}.bak'.format(upload_file_name), '/scratch/{}'.format(upload_file_name), sample_id)
     except Exception as exc:
-        print("[DEBUG] Error trimming VCF annotations. {}|{}|{}|{}|{}|{}".format(
-            udn_id, file_bucket, file_key, sample_id, upload_file_name, file_type), flush=True)
-
-        LOGGER.debug('process_vcf failed trim - {}'.format(exc))
+        write_to_logs("[ERROR] Step 2 - Processing File: Failed to trim annotations for VCF file {} with error {}".format(
+            upload_file_name, exc), logger)
         os.rename('/scratch/{}.bak'.format(upload_file_name), '/scratch/{}'.format(upload_file_name))
 
         return False
 
-    print("[DEBUG] Compressing and indexing VCF", flush=True)
+    write_to_logs("Step 2 - Processing File: Compressing and indexing VCF {}".format(upload_file_name))
     pysam.tabix_index('/scratch/{}'.format(upload_file_name), preset='vcf', force=True)
 
     with tarfile.TarFile('/scratch/vcf_archive.tar', 'a') as archive:
-        print("[DEBUG] adding {} to archive".format(upload_file_name))
+        print("Step 2 - Processing File: Adding {} to archive".format(upload_file_name))
         for name in ('{}.gz'.format(upload_file_name), '{}.gz.tbi'.format(upload_file_name)):
             archive.add('/scratch/{}'.format(name), arcname=name)
             os.remove('/scratch/{}'.format(name))
@@ -148,11 +131,10 @@ def upload_vcf_archive(aspera_vcf_location_code, testing, testing_bucket, testin
     upload_file_name = 'vcf_archive_{}.tar'.format(uuid.uuid1())
     os.rename('/scratch/vcf_archive.tar', '/scratch/{}'.format(upload_file_name))
 
-    # Do not upload to DbGap if testing
     if testing:
         s3_filename = testing_folder + '/' + upload_file_name
-        print("[DEBUG] Attempting to copy file " + upload_file_name +
-              " to S3 bucket for storage under " + s3_filename + ".", flush=True)
+        write_to_logs("[TESTING] Step 3 - File Upload: Attempting to copy file {} to S3 bucket for storage under {}".format(
+            upload_file_name, s3_filename))
         testing_s3 = get_s3_client()
         testing_s3.meta.client.upload_file(
             '/scratch/' + upload_file_name, testing_bucket, s3_filename)
@@ -160,10 +142,11 @@ def upload_vcf_archive(aspera_vcf_location_code, testing, testing_bucket, testin
         try:
             upload_location = "subasp@upload.ncbi.nlm.nih.gov:uploads/upload_requests/{}/".format(
                 aspera_vcf_location_code)
-            print("[DEBUG] Attempting to upload file {} via Aspera to {}".format(
-                upload_file_name, upload_location), flush=True)
+            write_to_logs("Step 3 - File Upload: Attempting to upload file {} via Aspera to {}".format(
+                upload_file_name, upload_location))
             upload_output = check_output(
                 ["/home/aspera/.aspera/connect/bin/ascp --file-crypt=encrypt -i /aspera/aspera_vcf.pk /scratch/" + upload_file_name + " " + upload_location], shell=True)
-            print(upload_output, flush=True)
+            write_to_logs("Step 3 - File Upload: Aspera returned {}", format(upload_output))
         except:
-            print("[ERROR] Error sending files via Aspera - ", sys.exc_info()[:2], flush=True)
+            write_to_logs(
+                "[ERROR] Step 3 - File Upload: Failed to send archive file via Aspera with error {}".format(sys.exc_info()[:2]))
