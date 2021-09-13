@@ -4,6 +4,8 @@ Utilities for interacting with the UDN Gateway
 import json
 import requests
 
+from utilities import write_to_logs
+
 
 def call_udngateway_mark_complete(id, secret, logger):
     """
@@ -19,14 +21,10 @@ def call_udngateway_mark_complete(id, secret, logger):
             {'id': id}), headers=headers, verify=False, timeout=5)
 
         if resp.status_code == 200:
-            success_message = "Marked File Complete: {}".format(id)
-            print(success_message, flush=True)
-            logger.debug(success_message)
+            write_to_logs("Step 4: Mark File Complete: Successfully marked file with export id {} complete".format(id), logger)
         else:
-            error_message = "Failed to Mark File Complete: {}".format(id)
-            print(error_message, flush=True)
-            logger.debug(error_message)
-    except Exception:
-        error_message = "Failed to Mark File Complete: {}".format(id)
-        print(error_message, flush=True)
-        logger.debug(error_message)
+            write_to_logs("Step 4: Mark File Complete: Failed to mark file with export id {} complete with status code {}".format(
+                id, resp.status_code), logger)
+    except Exception as exc:
+        write_to_logs(
+            "Step 4: Mark File Complete: Failed to mark file with export id {} complete with error {}".format(id, exc), logger)

@@ -2,20 +2,23 @@
 Utilities for processing BAM files
 """
 import hashlib
+from logging import error
 import os
 from subprocess import call, check_output, CalledProcessError
+from utilities import write_to_logs
 
 
-def process_bam(udn_id, file_bucket, file_key, sample_id, upload_file_name, file_type, temp_file):
+def process_bam(udn_id, file_bucket, file_key, sample_id, upload_file_name, file_type, temp_file, logger):
     bam_headers = list()
+    write_to_logs("Step 2 - Processing File: Running samtools on BAM")
 
     try:
         bam_headers = check_output(['samtools', 'view', '-H', temp_file]).decode('ascii').split('\n')
-    except CalledProcessError as e:
-        print("[DEBUG] Error retrieving header from bam file. Error code {}. {}|{}|{}|{}|{}|{}".format(
-            e.returncode, udn_id, file_bucket, file_key, sample_id,
-            upload_file_name, file_type
-        ), flush=True)
+    except CalledProcessError as exc:
+        error_message = "[ERROR] Step 2 - Processing File: Unable to retrieve headers from BAM file {} with error {}".format(
+            upload_file_name, exc)
+        write_to_logs(error_message, logger)
+        raise Exception(error_message)
 
     output_headers = list()
     for header in bam_headers:
@@ -39,16 +42,26 @@ def process_bam(udn_id, file_bucket, file_key, sample_id, upload_file_name, file
 
     with open('/scratch/md5_reheader', 'wb') as f:
         try:
-            # more secure alternative to `shell=True` with redirection
             call(['samtools', 'reheader', '-P', '/scratch/new_headers.sam', temp_file], stdout=f)
-        except CalledProcessError as e:
-            print("[DEBUG] Error reheading bam file. Error code {}. {}|{}|{}|{}|{}|{}".format(
-                e.returncode, udn_id, file_bucket, file_key, sample_id,
-                upload_file_name, file_type
-            ), flush=True)
+        except CalledProcessError as exc:
+            error_message = "[ERROR] Step 2 - Processing File: Unable to run samtools reheader command on BAM file {} with error {}".format(
+                upload_file_name, exc)
+            write_to_logs(error_message, logger)
+            raise Exception(error_message)
 
     os.rename('/scratch/md5_reheader', os.path.join('/scratch', upload_file_name))
-    print("[DEBUG] Done processing file. Verify MD5 if present.", flush=True)
+
+    write_to_logs("Step 2 - Processing File: Completed reheader now calling quickcheck")
+
+    quickcheck_result = call('samtools quickcheck -v {} && exit 0 || exit 1'.format(temp_file), shell=True)
+
+    if quickcheck_result == 0:
+        write_to_logs("Step 2 - Processing File: Quickcheck completed successfully now attempting MD5")
+    else:
+        error_message = "[ERROR] Step 2 - Processing File: Quickcheck failed on reheadered BAM {}".format(
+            upload_file_name)
+        write_to_logs(error_message, logger)
+        raise Exception(error_message)
 
     # bams are usually very big so stream instead of reading it all into memory
     md5_hash = hashlib.md5()
@@ -61,5 +74,7 @@ def process_bam(udn_id, file_bucket, file_key, sample_id, upload_file_name, file
                 break
 
             md5_hash.update(buf)
+
+    write_to_logs("Step 2 - Processing File: MD5 completed successfully")
 
     return md5_hash.hexdigest()

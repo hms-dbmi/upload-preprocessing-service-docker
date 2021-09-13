@@ -2,15 +2,13 @@
 Utilities functions for creating XML files for dbGaP submission
 """
 import codecs
-import logging
+from logging import error
 import os
 import sys
 import tarfile
 import xml.etree.ElementTree as ET
 from subprocess import call
-from utilities import silent_remove
-
-LOGGER = logging.getLogger('ups')
+from utilities import silent_remove, write_to_logs
 
 ALIGNMENT_SOFTWARE = {
     2: 'BWA v0.6.2',
@@ -68,9 +66,9 @@ def create_xml_library(dna_source, fileservice_uuid, instrument_model, md5_check
 
         return library
     except Exception as exc:
-        error_message = "[DEBUG] ERROR - Failed to create XML library object files for {} with error {}".format(
+        error_message = "[ERROR] Step 2 - Processing File: Failed to create XML library object files for {} with error {}".format(
             upload_file_name, exc)
-        print(error_message, flush=True)
+        write_to_logs(error_message)
         raise Exception(error_message)
 
 
@@ -93,8 +91,8 @@ def xml_indent(elem, level=0):
             if level and (not elem.tail or not elem.tail.strip()):
                 elem.tail = i
     except Exception as exc:
-        error_message = "[DEBUG] ERROR - Failed to indent XML with error {}".format(exc)
-        print(error_message, flush=True)
+        error_message = "[ERROR] Step 2 - Processing File: Failed to indent XML with error {}".format(exc)
+        write_to_logs(error_message)
         raise Exception(error_message)
 
 
@@ -216,8 +214,8 @@ def format_experiment_xml(library):
 
         return ET.ElementTree(xml_exp_set)
     except Exception as exc:
-        error_message = "[DEBUG] ERROR - Failed to format experiment XML with error {}".format(exc)
-        print(error_message, flush=True)
+        error_message = "[ERROR] Step 2 - Processing File: Failed to format experiment XML with error {}".format(exc)
+        write_to_logs(error_message)
         raise Exception(error_message)
 
 
@@ -265,8 +263,8 @@ def format_run_xml(library):
 
         return ET.ElementTree(xml_run_set)
     except Exception as exc:
-        error_message = "[DEBUG] ERROR - Failed to format run XML with error {}".format(exc)
-        print(error_message, flush=True)
+        error_message = "[ERROR] Step 2 - Processing File: Failed to format run XML with error {}".format(exc)
+        write_to_logs(error_message)
         raise Exception(error_message)
 
 
@@ -302,16 +300,16 @@ def format_submission_xml(library):
 
         return ET.ElementTree(xml_submission)
     except Exception as exc:
-        error_message = "[DEBUG] ERROR - Failed to format submission XML with error {}".format(exc)
-        print(error_message, flush=True)
+        error_message = "[ERROR] Step 2 - Processing File: Failed to format submission XML with error {}".format(exc)
+        write_to_logs(error_message)
         raise Exception(error_message)
 
 
-def create_and_tar_xml(dna_source, fileservice_uuid, instrument_model, md5_checksum, read_lengths, sample_id, sequence_type, upload_file_name):
+def create_and_tar_xml(dna_source, fileservice_uuid, instrument_model, md5_checksum, read_lengths, sample_id, sequence_type, upload_file_name, logger):
     """
     Creates the XML files for the BAM file and
     """
-    print("[DEBUG] Begin creation of XML files for {}".format(upload_file_name), flush=True)
+    write_to_logs("Step 2 - Processing File: Creating XML for {}".format(upload_file_name))
 
     temp_experiment_file = '/scratch/experiment.xml'
     temp_run_file = "/scratch/run.xml"
@@ -338,12 +336,12 @@ def create_and_tar_xml(dna_source, fileservice_uuid, instrument_model, md5_check
         submission_file_handle.write(codecs.decode(submission_xml, "utf-8"))
         submission_file_handle.close()
     except Exception as exc:
-        error_message = "[DEBUG] ERROR - Failed creation of XML files for {} with error {}".format(
+        error_message = "[ERROR] Step 2 - Processing File: Failed creation of XML files for {} with error {}".format(
             upload_file_name, exc)
-        print(error_message, flush=True)
+        write_to_logs(error_message, logger)
         raise Exception(error_message)
 
-    print("[DEBUG] XML files created for {}, beginning validation".format(upload_file_name), flush=True)
+    write_to_logs("Step 2 - Processing File: Validating XML for {}".format(upload_file_name))
 
     exp_result = call(
         'xmllint --schema http://www.ncbi.nlm.nih.gov/viewvc/v1/trunk/sra/doc/SRA/SRA.experiment.xsd?view=co /scratch/experiment.xml > /dev/null', shell=True)
@@ -353,22 +351,24 @@ def create_and_tar_xml(dna_source, fileservice_uuid, instrument_model, md5_check
         'xmllint --schema http://www.ncbi.nlm.nih.gov/viewvc/v1/trunk/sra/doc/SRA/SRA.submission.xsd?view=co /scratch/submission.xml > /dev/null', shell=True)
 
     if exp_result == 0 and run_result == 0 and sub_result == 0:
-        print("[DEBUG] Successful validation of XML files for {}".format(upload_file_name), flush=True)
+        print("Step 2 - Processing File: Successful validation of XML files for {}".format(upload_file_name), flush=True)
     else:
-        error_message = "[DEBUG] ERROR - Failed validation of XML files for {} - exp_result ==> {}; run_result ==> {}; sub_result ==> {} ".format(
+        error_message = "[ERROR] Step 2 - Processing File: Failed validation of XML files for {} - exp_result ==> {}; run_result ==> {}; sub_result ==> {} ".format(
             upload_file_name, exp_result, run_result, sub_result)
-        print(error_message, flush=True)
+        write_to_logs(error_message, logger)
         raise Exception(error_message)
 
     tar_file_name = os.path.join('/scratch', '{}.tar'.format(upload_file_name))
     tar = tarfile.open(tar_file_name, "w")
 
     for name in ['/scratch/experiment.xml', '/scratch/run.xml', '/scratch/submission.xml']:
-        print("[DEBUG] Adding {} to tar file".format(name))
+        write_to_logs("Step 2 - Processing File: Adding {} to tar file".format(name))
         try:
             tar.add(name)
         except:
-            print("[DEBUG] Error adding {} to tar file".format(name))
+            error_message = "Step 2 - Processing File: Error adding {} to tar file".format(name)
+            write_to_logs(error_message, logger)
+            raise Exception(error_message)
 
     tar.close()
 

@@ -35,3 +35,14 @@ def silent_remove(filename):
     except OSError as e:
         if e.errno != errno.ENOENT:
             raise
+
+
+def write_to_logs(message, logger=None):
+    """
+    Uses print statement to write message to CloudWatch log and optionally
+    writes message to the logger if provided
+    """
+    print(message, flush=True)
+
+    if logger:
+        logger.debug(message)
