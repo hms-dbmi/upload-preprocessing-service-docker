@@ -1,0 +1,23 @@
+<RUN_SET>
+    <RUN>
+        <IDENTIFIERS>
+            <SUBMITTER_ID namespace="HMS-CC">b2b0c9ad-1292-43cd-aeed-6b492e67252d</SUBMITTER_ID>
+        </IDENTIFIERS>
+        <EXPERIMENT_REF>
+            <IDENTIFIERS>
+                <SUBMITTER_ID namespace="HMS-CC">e40d8f23-2f59-49b7-bb78-bf9fecc1beeb</SUBMITTER_ID>
+            </IDENTIFIERS>
+        </EXPERIMENT_REF>
+        <DATA_BLOCK>
+            <FILES>
+                <FILE checksum="d41d8cd98f00b204e9800998ecf8427e" checksum_method="MD5" filename="b2b0c9ad-1292-43cd-aeed-6b492e67252d.bam" filetype="bam"></FILE>
+            </FILES>
+        </DATA_BLOCK>
+        <RUN_ATTRIBUTES>
+            <RUN_ATTRIBUTE>
+                <TAG>assembly</TAG>
+                <VALUE>GRCh37/hg19</VALUE>
+            </RUN_ATTRIBUTE>
+        </RUN_ATTRIBUTES>
+    </RUN>
+</RUN_SET>

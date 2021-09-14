@@ -2,13 +2,12 @@
 Utilities functions for creating XML files for dbGaP submission
 """
 import codecs
-from logging import error
 import os
 import sys
 import tarfile
-import xml.etree.ElementTree as ET
+from lxml import etree
 from subprocess import call
-from utilities import silent_remove, write_to_logs
+from src.utilities import silent_remove, write_to_logs
 
 ALIGNMENT_SOFTWARE = {
     2: 'BWA v0.6.2',
@@ -39,7 +38,9 @@ XML_CONTACTS = [
 ]
 
 
-def create_xml_library(dna_source, fileservice_uuid, instrument_model, md5_checksum, read_lengths, sample_id, sequence_type, upload_file_name):
+def create_xml_library(
+        dna_source, fileservice_uuid, instrument_model, md5_checksum, read_lengths, sample_id, sequence_type,
+        upload_file_name):
     """
     Create the library object used for creating the XML files
     """
@@ -50,13 +51,13 @@ def create_xml_library(dna_source, fileservice_uuid, instrument_model, md5_check
         library['design_description'] = DESIGN_DESC[sequence_type]
         library['filename'] = fileservice_uuid
         library['instrument_model'] = instrument_model
-        library['library_layout'] = 'paired'
+        library['library_layout'] = 'PAIRED'
         library['md5_checksum'] = md5_checksum
         library['phs_accession'] = 'phs001232'
         library['platform'] = 'ILLUMINA'
         library['read_lengths'] = make_read_length_list(read_lengths)
         library['reference'] = 'GRCh37/hg19'
-        library['sample_ID'] = sample_id
+        library['sample_id'] = sample_id
         library['selection'] = 'RANDOM'
         library['source'] = 'GENOMIC'
         library['strategy'] = SEQUENCING_TYPE[sequence_type]
@@ -98,11 +99,11 @@ def xml_indent(elem, level=0):
 
 def xml_to_string(xml):
     """
-    properly formats XML as String
+    Properly formats XML as String
     """
     elem = xml.getroot()
     xml_indent(elem)
-    return ET.tostring(elem, encoding="utf-8")
+    return etree.tostring(elem, encoding="utf-8")
 
 
 def get_title_prefix(sequence_type, dna_source):
@@ -134,85 +135,79 @@ def format_experiment_xml(library):
     Converts libraries into "experiment_set" ElementTree object
     """
     try:
-        xml_exp_set = ET.Element("EXPERIMENT_SET")
-        xml_exp = ET.SubElement(xml_exp_set, "EXPERIMENT")
-        xml_e_identifiers = ET.SubElement(xml_exp, "IDENTIFIERS")
-        xml_e_submitter_id = ET.SubElement(xml_e_identifiers, "SUBMITTER_ID")
+        xml_exp_set = etree.Element("EXPERIMENT_SET")
+        xml_exp = etree.SubElement(xml_exp_set, "EXPERIMENT")
+        xml_e_identifiers = etree.SubElement(xml_exp, "IDENTIFIERS")
+        xml_e_submitter_id = etree.SubElement(xml_e_identifiers, "SUBMITTER_ID")
         xml_e_submitter_id.set("namespace", library['center'])
-        xml_e_submitter_id.text = library["sample_ID"]
-        xml_title = ET.SubElement(xml_exp, "TITLE")
+        xml_e_submitter_id.text = library["sample_id"]
+        xml_title = etree.SubElement(xml_exp, "TITLE")
         xml_title.text = library["title"]
-        xml_study_ref = ET.SubElement(xml_exp, "STUDY_REF")
+        xml_study_ref = etree.SubElement(xml_exp, "STUDY_REF")
         xml_study_ref.set("accession", library["phs_accession"])
-        xml_design = ET.SubElement(xml_exp, "DESIGN")
-        xml_des_desc = ET.SubElement(xml_design, "DESIGN_DESCRIPTION")
+        xml_design = etree.SubElement(xml_exp, "DESIGN")
+        xml_des_desc = etree.SubElement(xml_design, "DESIGN_DESCRIPTION")
         xml_des_desc.text = library["design_description"]
-        xml_smp_desc = ET.SubElement(xml_design, "SAMPLE_DESCRIPTOR")
-        xml_smp_desc.set("refname", library["sample_ID"])
+        xml_smp_desc = etree.SubElement(xml_design, "SAMPLE_DESCRIPTOR")
+        xml_smp_desc.set("refname", library["sample_id"])
         xml_smp_desc.set("refcenter", library["phs_accession"])
-        xml_lib_desc = ET.SubElement(xml_design, "LIBRARY_DESCRIPTOR")
-        xml_lib_name = ET.SubElement(xml_lib_desc, "LIBRARY_NAME")
-        xml_lib_name.text = library["sample_ID"]
-        xml_lib_strat = ET.SubElement(xml_lib_desc, "LIBRARY_STRATEGY")
+        xml_lib_desc = etree.SubElement(xml_design, "LIBRARY_DESCRIPTOR")
+        xml_lib_name = etree.SubElement(xml_lib_desc, "LIBRARY_NAME")
+        xml_lib_name.text = library["sample_id"]
+        xml_lib_strat = etree.SubElement(xml_lib_desc, "LIBRARY_STRATEGY")
         xml_lib_strat.text = library["strategy"]
-        xml_lib_src = ET.SubElement(xml_lib_desc, "LIBRARY_SOURCE")
+        xml_lib_src = etree.SubElement(xml_lib_desc, "LIBRARY_SOURCE")
         xml_lib_src.text = library["source"]
-        xml_lib_sel = ET.SubElement(xml_lib_desc, "LIBRARY_SELECTION")
+        xml_lib_sel = etree.SubElement(xml_lib_desc, "LIBRARY_SELECTION")
         xml_lib_sel.text = library["selection"]
-        xml_lib_layout = ET.SubElement(xml_lib_desc, "LIBRARY_LAYOUT")
-
-        if library["library_layout"] == 'paired':
-            ET.SubElement(xml_lib_layout, "PAIRED")
-        elif library["library_layout"] == 'single':
-            ET.SubElement(xml_lib_layout, "SINGLE")
-        else:
-            sys.exit(4)
+        xml_lib_layout = etree.SubElement(xml_lib_desc, "LIBRARY_LAYOUT")
+        etree.SubElement(xml_lib_layout, library["library_layout"])
 
         if library["read_lengths"]:
-            xml_spot_desc = ET.SubElement(xml_design, "SPOT_DESCRIPTOR")
-            xml_decode_spec = ET.SubElement(xml_spot_desc, "SPOT_DECODE_SPEC")
+            xml_spot_desc = etree.SubElement(xml_design, "SPOT_DESCRIPTOR")
+            xml_decode_spec = etree.SubElement(xml_spot_desc, "SPOT_DECODE_SPEC")
 
             if sum(library["read_lengths"]) > 0:
-                xml_spot_len = ET.SubElement(xml_decode_spec, "SPOT_LENGTH")
+                xml_spot_len = etree.SubElement(xml_decode_spec, "SPOT_LENGTH")
                 xml_spot_len.text = str(sum(library["read_lengths"]))
 
             for i in range(0, len(library["read_lengths"])):
-                xml_read_spec = ET.SubElement(xml_decode_spec, "READ_SPEC")
-                xml_read_index = ET.SubElement(xml_read_spec, "READ_INDEX")
+                xml_read_spec = etree.SubElement(xml_decode_spec, "READ_SPEC")
+                xml_read_index = etree.SubElement(xml_read_spec, "READ_INDEX")
                 xml_read_index.text = str(i)
-                xml_read_class = ET.SubElement(xml_read_spec, "READ_CLASS")
+                xml_read_class = etree.SubElement(xml_read_spec, "READ_CLASS")
                 xml_read_class.text = "Application Read"
 
                 if i == 0:
-                    xml_read_type = ET.SubElement(xml_read_spec, "READ_TYPE")
+                    xml_read_type = etree.SubElement(xml_read_spec, "READ_TYPE")
                     xml_read_type.text = "Forward"
-                    xml_base_coord = ET.SubElement(xml_read_spec, "BASE_COORD")
+                    xml_base_coord = etree.SubElement(xml_read_spec, "BASE_COORD")
                     xml_base_coord.text = "1"
                 elif i == 1:
-                    xml_read_type = ET.SubElement(xml_read_spec, "READ_TYPE")
+                    xml_read_type = etree.SubElement(xml_read_spec, "READ_TYPE")
                     xml_read_type.text = "Reverse"
-                    xml_base_coord = ET.SubElement(xml_read_spec, "BASE_COORD")
+                    xml_base_coord = etree.SubElement(xml_read_spec, "BASE_COORD")
                     xml_base_coord.text = str(library["read_lengths"][i - 1] + 1)
                 else:
                     sys.exit(5)
 
-        xml_platform = ET.SubElement(xml_exp, "PLATFORM")
-        xml_mftr = ET.SubElement(xml_platform, library["platform"])
-        xml_model = ET.SubElement(xml_mftr, "INSTRUMENT_MODEL")
+        xml_platform = etree.SubElement(xml_exp, "PLATFORM")
+        xml_mftr = etree.SubElement(xml_platform, library["platform"])
+        xml_model = etree.SubElement(xml_mftr, "INSTRUMENT_MODEL")
         xml_model.text = library["instrument_model"]
 
         if library["attributes"]:
-            xml_e_attributes = ET.SubElement(xml_exp, "EXPERIMENT_ATTRIBUTES")
+            xml_e_attributes = etree.SubElement(xml_exp, "EXPERIMENT_ATTRIBUTES")
 
             for attribute in library["attributes"]:
-                xml_e_attribute = ET.SubElement(
+                xml_e_attribute = etree.SubElement(
                     xml_e_attributes, "EXPERIMENT_ATTRIBUTE")
-                xml_tag = ET.SubElement(xml_e_attribute, "TAG")
+                xml_tag = etree.SubElement(xml_e_attribute, "TAG")
                 xml_tag.text = attribute[0]
-                xml_value = ET.SubElement(xml_e_attribute, "VALUE")
+                xml_value = etree.SubElement(xml_e_attribute, "VALUE")
                 xml_value.text = attribute[1]
 
-        return ET.ElementTree(xml_exp_set)
+        return etree.ElementTree(xml_exp_set)
     except Exception as exc:
         error_message = "[ERROR] Step 2 - Processing File: Failed to format experiment XML with error {}".format(exc)
         write_to_logs(error_message)
@@ -224,20 +219,20 @@ def format_run_xml(library):
     Converts libraries into "run_set" ElementTree object
     """
     try:
-        xml_run_set = ET.Element("RUN_SET")
-        xml_run = ET.SubElement(xml_run_set, "RUN")
-        xml_r_identifiers = ET.SubElement(xml_run, "IDENTIFIERS")
-        xml_r_submitter_id = ET.SubElement(xml_r_identifiers, "SUBMITTER_ID")
+        xml_run_set = etree.Element("RUN_SET")
+        xml_run = etree.SubElement(xml_run_set, "RUN")
+        xml_r_identifiers = etree.SubElement(xml_run, "IDENTIFIERS")
+        xml_r_submitter_id = etree.SubElement(xml_r_identifiers, "SUBMITTER_ID")
         xml_r_submitter_id.set("namespace", library['center'])
         xml_r_submitter_id.text = library["filename"]
-        xml_experiment_ref = ET.SubElement(xml_run, "EXPERIMENT_REF")
-        xml_e_identifiers = ET.SubElement(xml_experiment_ref, "IDENTIFIERS")
-        xml_e_submitter_id = ET.SubElement(xml_e_identifiers, "SUBMITTER_ID")
+        xml_experiment_ref = etree.SubElement(xml_run, "EXPERIMENT_REF")
+        xml_e_identifiers = etree.SubElement(xml_experiment_ref, "IDENTIFIERS")
+        xml_e_submitter_id = etree.SubElement(xml_e_identifiers, "SUBMITTER_ID")
         xml_e_submitter_id.set("namespace", library['center'])
-        xml_e_submitter_id.text = library["sample_ID"]
-        xml_data_block = ET.SubElement(xml_run, "DATA_BLOCK")
-        xml_files = ET.SubElement(xml_data_block, "FILES")
-        xml_file = ET.SubElement(xml_files, "FILE")
+        xml_e_submitter_id.text = library["sample_id"]
+        xml_data_block = etree.SubElement(xml_run, "DATA_BLOCK")
+        xml_files = etree.SubElement(xml_data_block, "FILES")
+        xml_file = etree.SubElement(xml_files, "FILE")
 
         xml_file.set("checksum", library['md5_checksum'])
         xml_file.set("checksum_method", "MD5")
@@ -245,23 +240,23 @@ def format_run_xml(library):
         xml_file.set("filetype", 'bam')
 
         if library["reference"] is not None or library["latf_load"]:
-            xml_r_attributes = ET.SubElement(xml_run, "RUN_ATTRIBUTES")
+            xml_r_attributes = etree.SubElement(xml_run, "RUN_ATTRIBUTES")
 
             if library["reference"] is not None:
-                xml_r_attribute = ET.SubElement(xml_r_attributes, "RUN_ATTRIBUTE")
-                xml_tag = ET.SubElement(xml_r_attribute, "TAG")
+                xml_r_attribute = etree.SubElement(xml_r_attributes, "RUN_ATTRIBUTE")
+                xml_tag = etree.SubElement(xml_r_attribute, "TAG")
                 xml_tag.text = "assembly"
-                xml_value = ET.SubElement(xml_r_attribute, "VALUE")
+                xml_value = etree.SubElement(xml_r_attribute, "VALUE")
                 xml_value.text = library["reference"]
 
             if library["latf_load"]:
-                xml_r_attribute = ET.SubElement(xml_r_attributes, "RUN_ATTRIBUTE")
-                xml_tag = ET.SubElement(xml_r_attribute, "TAG")
+                xml_r_attribute = etree.SubElement(xml_r_attributes, "RUN_ATTRIBUTE")
+                xml_tag = etree.SubElement(xml_r_attribute, "TAG")
                 xml_tag.text = "loader"
-                xml_value = ET.SubElement(xml_r_attribute, "VALUE")
+                xml_value = etree.SubElement(xml_r_attribute, "VALUE")
                 xml_value.text = "latf-load"
 
-        return ET.ElementTree(xml_run_set)
+        return etree.ElementTree(xml_run_set)
     except Exception as exc:
         error_message = "[ERROR] Step 2 - Processing File: Failed to format run XML with error {}".format(exc)
         write_to_logs(error_message)
@@ -273,7 +268,7 @@ def format_submission_xml(library):
     Converts a library into a "submission" ElementTree object
     """
     try:
-        xml_submission = ET.Element("SUBMISSION")
+        xml_submission = etree.Element("SUBMISSION")
         xml_submission.set('alias', library['phs_accession'] + '.v2')
         xml_submission.set('center_name', library['center'])
         xml_submission.set(
@@ -282,23 +277,23 @@ def format_submission_xml(library):
             'xsi:noNamespaceSchemaLocation',
             'http://www.ncbi.nlm.nih.gov/viewvc/v1/trunk/sra/doc/SRA/SRA.submission.xsd?view=co')
 
-        xml_contacts = ET.SubElement(xml_submission, "CONTACTS")
+        xml_contacts = etree.SubElement(xml_submission, "CONTACTS")
 
         for contact in XML_CONTACTS:
-            xml_contact = ET.SubElement(xml_contacts, "CONTACT")
+            xml_contact = etree.SubElement(xml_contacts, "CONTACT")
             xml_contact.set('name', contact['name'])
             xml_contact.set('inform_on_error', contact['email'])
             xml_contact.set('inform_on_status', contact['email'])
 
-        xml_actions = ET.SubElement(xml_submission, 'ACTIONS')
+        xml_actions = etree.SubElement(xml_submission, 'ACTIONS')
 
         for action in XML_ACTIONS:
-            xml_action = ET.SubElement(xml_actions, 'ACTION')
-            xml_action_add = ET.SubElement(xml_action, 'ADD')
+            xml_action = etree.SubElement(xml_actions, 'ACTION')
+            xml_action_add = etree.SubElement(xml_action, 'ADD')
             xml_action_add.set('source', action['source'])
             xml_action_add.set('schema', action['schema'])
 
-        return ET.ElementTree(xml_submission)
+        return etree.ElementTree(xml_submission)
     except Exception as exc:
         error_message = "[ERROR] Step 2 - Processing File: Failed to format submission XML with error {}".format(exc)
         write_to_logs(error_message)
