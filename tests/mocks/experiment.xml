@@ -1,0 +1,50 @@
+<EXPERIMENT_SET>
+    <EXPERIMENT>
+        <IDENTIFIERS>
+            <SUBMITTER_ID namespace="HMS-CC">e40d8f23-2f59-49b7-bb78-bf9fecc1beeb</SUBMITTER_ID>
+        </IDENTIFIERS>
+        <TITLE>exome sequencing of homo sapiens: whole blood: Sample e40d8f23-2f59-49b7-bb78-bf9fecc1beeb</TITLE>
+        <STUDY_REF accession="phs001232"></STUDY_REF>
+        <DESIGN>
+            <DESIGN_DESCRIPTION>The exome capture utilizes the NimbleGen liquid capture on HGSC VCRome 2.1 that targets approximately 34 Mbp of genomic DNA including all coding exons of currently known disease genes (OMIM, HGMD, and GeneTests). To enhance the coverage of clinically relevant disease genes, the spike-in probe set (Exome 3 - PKV2) is used in 1:1.25 equimolar ratio with the VCRome exome capture design</DESIGN_DESCRIPTION>
+            <SAMPLE_DESCRIPTOR refname="e40d8f23-2f59-49b7-bb78-bf9fecc1beeb" refcenter="phs001232"></SAMPLE_DESCRIPTOR>
+            <LIBRARY_DESCRIPTOR>
+                <LIBRARY_NAME>e40d8f23-2f59-49b7-bb78-bf9fecc1beeb</LIBRARY_NAME>
+                <LIBRARY_STRATEGY>WXS</LIBRARY_STRATEGY>
+                <LIBRARY_SOURCE>GENOMIC</LIBRARY_SOURCE>
+                <LIBRARY_SELECTION>RANDOM</LIBRARY_SELECTION>
+                <LIBRARY_LAYOUT>
+                    <PAIRED></PAIRED>
+                </LIBRARY_LAYOUT>
+            </LIBRARY_DESCRIPTOR>
+            <SPOT_DESCRIPTOR>
+                <SPOT_DECODE_SPEC>
+                    <SPOT_LENGTH>200</SPOT_LENGTH>
+                    <READ_SPEC>
+                        <READ_INDEX>0</READ_INDEX>
+                        <READ_CLASS>Application Read</READ_CLASS>
+                        <READ_TYPE>Forward</READ_TYPE>
+                        <BASE_COORD>1</BASE_COORD>
+                    </READ_SPEC>
+                    <READ_SPEC>
+                        <READ_INDEX>1</READ_INDEX>
+                        <READ_CLASS>Application Read</READ_CLASS>
+                        <READ_TYPE>Reverse</READ_TYPE>
+                        <BASE_COORD>101</BASE_COORD>
+                    </READ_SPEC>
+                </SPOT_DECODE_SPEC>
+            </SPOT_DESCRIPTOR>
+        </DESIGN>
+        <PLATFORM>
+            <ILLUMINA>
+                <INSTRUMENT_MODEL>Illumina NovaSeq 5000</INSTRUMENT_MODEL>
+            </ILLUMINA>
+        </PLATFORM>
+        <EXPERIMENT_ATTRIBUTES>
+            <EXPERIMENT_ATTRIBUTE>
+                <TAG>alignment_software</TAG>
+                <VALUE>BWA v0.6.2</VALUE>
+            </EXPERIMENT_ATTRIBUTE>
+        </EXPERIMENT_ATTRIBUTES>
+    </EXPERIMENT>
+</EXPERIMENT_SET>

@@ -4,7 +4,11 @@ This repo contains a docker container that will process VCF and BAM files to sen
 
 ## Local Dev
 1) Create a Virtual Environment with `python3 -m venv venv`
-2) Install necessary libraries with `python3 -m pip install autopep8 boto3 requests pylint pysam`
+2) Install necessary libraries with `python3 -m pip install autopep8 boto3 lxml requests pylint pysam xmltodict`
+
+## Running Tests
+1) Activate your Virtual Environment
+2) Run all tests with `python -m unittest`
 
 ## Uploading docker images to Amazon ECR
 
@@ -82,7 +86,7 @@ queue.send_message(MessageBody='queue_file', \
    MessageAttributes={ \
        'UDN_ID': {'StringValue': '[UDN ID]', \
                   'DataType': 'String'}, \
-       'sample_ID': {'StringValue': '[guid of the sample]', \
+       'sample_id': {'StringValue': '[guid of the sample]', \
                      'DataType': 'String'}, \
        'FileBucket': {'StringValue': 'udnarchive', \
                       'DataType': 'String'}, \

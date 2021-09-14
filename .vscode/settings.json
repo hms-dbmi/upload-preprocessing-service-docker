@@ -5,7 +5,7 @@
     "python.linting.lintOnSave": true,
     "python.formatting.autopep8Path": "${workspaceRoot}/venv/bin/autopep8",
     "python.envFile": "${workspaceRoot}/.env",
-    "python.pythonPath": "venv/bin/python3",
+    "python.pythonPath": "${workspaceRoot}/venv/bin/python3",
     "python.autoComplete.extraPaths": [
         "${workspaceRoot}/src",
         "${workspaceRoot}/venv/lib/python3.8/site-packages",
