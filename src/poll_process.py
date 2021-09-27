@@ -4,7 +4,7 @@ import botocore
 import time
 from subprocess import check_output
 
-from aws_utils import get_queue_by_name, get_s3_client, get_secret_from_secretes_manager, write_aspera_secrets_to_disk
+from aws_utils import get_queue_by_name, get_s3_client, get_secret_from_secrets_manager, write_aspera_secrets_to_disk
 from bams import process_bam
 from udn_gateway import call_udngateway_mark_complete
 from utilities import setup_logger, silent_remove, write_to_logs
@@ -13,7 +13,7 @@ from xml_utils import create_and_tar_xml
 
 LOGGER = setup_logger('ups')
 
-SECRET = get_secret_from_secretes_manager("ups-prod")
+SECRET = get_secret_from_secrets_manager("ups-prod")
 write_aspera_secrets_to_disk()
 
 # If testing, do not upload files to dbGaP, but instead save the processed file to a special S3 bucket
@@ -43,7 +43,7 @@ while True:
     write_to_logs("Step 1 - File Retrieval: Retrieving messages from queue - '{}'".format(QUEUE_NAME))
 
     messages = SQS_QUEUE.receive_messages(MaxNumberOfMessages=1, MessageAttributeNames=[
-        'dna_source', 'exportfile_id', 'file_type', 'file_url', 'fileservice_uuid', 'instrument_model',
+        'dna_data', 'exportfile_id', 'file_type', 'file_url', 'fileservice_uuid', 'instrument_model',
         'read_lengths', 'sample_id', 'sequence_type', 'udn_id'])
 
     write_to_logs("Step 1 - File Retrieval: Found {} messages".format(len(messages)))
@@ -55,7 +55,7 @@ while True:
             continue_and_delete = True
 
             if message.message_attributes is not None:
-                dna_source = message.message_attributes.get('dna_source').get('StringValue')
+                dna_data = message.message_attributes.get('dna_data').get('StringValue')
                 exportfile_id = message.message_attributes.get('exportfile_id').get('StringValue')
                 file_type = message.message_attributes.get('file_type').get('StringValue')
                 file_url = message.message_attributes.get('file_url').get('StringValue')
@@ -65,6 +65,8 @@ while True:
                 sample_id = message.message_attributes.get('sample_id').get('StringValue')
                 sequence_type = int(message.message_attributes.get('sequence_type').get('StringValue'))
                 udn_id = message.message_attributes.get('udn_id').get('StringValue')
+
+                (dna_source, reference_genome) = dna_data.split('|')
 
                 if file_type == 'BAM':
                     filename_extension = '.bam'
@@ -77,9 +79,9 @@ while True:
 
                 upload_file_name = "%s%s" % (fileservice_uuid, filename_extension)
 
-                if (dna_source and exportfile_id and file_type and file_url and fileservice_uuid and
-                        instrument_model and read_lengths and sample_id and sequence_type and udn_id and
-                        file_bucket and file_key and upload_file_name):
+                if (dna_source and exportfile_id and file_type and file_url and fileservice_uuid and instrument_model and
+                        read_lengths and reference_genome and sample_id and sequence_type and udn_id and file_bucket and
+                        file_key and upload_file_name):
                     write_to_logs(
                         "Step 1 - File Retrieval: Processing file {} for participant {}".format(upload_file_name, udn_id), LOGGER)
                     write_to_logs("Step 1 - File Retrieval: Downloading file {} from bucket {}".format(file_key, file_bucket))
@@ -102,8 +104,8 @@ while True:
                                 udn_id, file_bucket, file_key, sample_id, upload_file_name, file_type, temp_file, LOGGER)
 
                             tar_file_name = create_and_tar_xml(
-                                dna_source, fileservice_uuid, instrument_model, md5_checksum, read_lengths, sample_id, sequence_type,
-                                upload_file_name, LOGGER)
+                                dna_source, fileservice_uuid, instrument_model, md5_checksum, read_lengths, reference_genome, sample_id,
+                                SECRET, sequence_type, upload_file_name, LOGGER)
 
                             if TESTING:
                                 bam_file_path = os.path.join(TESTING_FOLDER, upload_file_name)

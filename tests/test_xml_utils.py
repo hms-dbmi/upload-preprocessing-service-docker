@@ -9,6 +9,8 @@ from src.xml_utils import (
     create_xml_library, format_experiment_xml, format_run_xml, format_submission_xml, get_title_prefix,
     make_read_length_list, xml_to_string)
 
+SECRET = {'accession': 'phs001232', 'accession_version': 'v4'}
+
 
 class TestXMLUtils(TestCase):
     """
@@ -21,7 +23,7 @@ class TestXMLUtils(TestCase):
         """
         xml_library = create_xml_library(
             'Blood', 'b2b0c9ad-1292-43cd-aeed-6b492e67252d', 'Illumina NovaSeq 5000', 'd41d8cd98f00b204e9800998ecf8427e',
-            '100, 100', 'e40d8f23-2f59-49b7-bb78-bf9fecc1beeb', 2, 'b2b0c9ad-1292-43cd-aeed-6b492e67252d.bam')
+            '100, 100', 'GRCh37/hg19', 'e40d8f23-2f59-49b7-bb78-bf9fecc1beeb', SECRET, 2, 'b2b0c9ad-1292-43cd-aeed-6b492e67252d.bam')
 
         self.assertEqual(xml_library['attributes'], [['alignment_software', 'BWA v0.6.2']])
         self.assertEqual(xml_library['center'], 'HMS-CC')
@@ -31,6 +33,7 @@ class TestXMLUtils(TestCase):
         self.assertEqual(xml_library['library_layout'], 'PAIRED')
         self.assertEqual(xml_library['md5_checksum'], 'd41d8cd98f00b204e9800998ecf8427e')
         self.assertEqual(xml_library['phs_accession'], 'phs001232')
+        self.assertEqual(xml_library['phs_accession_version'], 'v4')
         self.assertEqual(xml_library['platform'], 'ILLUMINA')
         self.assertEqual(xml_library['read_lengths'], [100, 100])
         self.assertEqual(xml_library['reference'], 'GRCh37/hg19')
@@ -52,7 +55,7 @@ class TestXMLUtils(TestCase):
 
         xml_library = create_xml_library(
             'Blood', 'b2b0c9ad-1292-43cd-aeed-6b492e67252d', 'Illumina NovaSeq 5000', 'd41d8cd98f00b204e9800998ecf8427e',
-            '100, 100', 'e40d8f23-2f59-49b7-bb78-bf9fecc1beeb', 2, 'b2b0c9ad-1292-43cd-aeed-6b492e67252d.bam')
+            '100, 100', 'GRCh37/hg19', 'e40d8f23-2f59-49b7-bb78-bf9fecc1beeb', SECRET, 2, 'b2b0c9ad-1292-43cd-aeed-6b492e67252d.bam')
 
         result = xmltodict.parse(etree.tostring(format_experiment_xml(xml_library)))
 
@@ -161,12 +164,12 @@ class TestXMLUtils(TestCase):
 
         xml_library = create_xml_library(
             'Blood', 'b2b0c9ad-1292-43cd-aeed-6b492e67252d', 'Illumina NovaSeq 5000', 'd41d8cd98f00b204e9800998ecf8427e',
-            '100, 100', 'e40d8f23-2f59-49b7-bb78-bf9fecc1beeb', 2, 'b2b0c9ad-1292-43cd-aeed-6b492e67252d.bam')
+            '100, 100', 'GRCh37/hg19', 'e40d8f23-2f59-49b7-bb78-bf9fecc1beeb', SECRET, 2, 'b2b0c9ad-1292-43cd-aeed-6b492e67252d.bam')
 
         result = xmltodict.parse(etree.tostring(format_run_xml(xml_library)))
 
         self.assertEqual(len(result['RUN_SET']), len(run['RUN_SET']))
-        self.assertEqual(len(result['RUN']), len(run['RUN']))
+        self.assertEqual(len(result['RUN_SET']['RUN']), len(run['RUN_SET']['RUN']))
 
         result_identifiers = result['RUN_SET']['RUN']['IDENTIFIERS']
         run_identifiers = run['RUN_SET']['RUN']['IDENTIFIERS']
@@ -211,7 +214,7 @@ class TestXMLUtils(TestCase):
 
         xml_library = create_xml_library(
             'Blood', 'b2b0c9ad-1292-43cd-aeed-6b492e67252d', 'Illumina NovaSeq 5000', 'd41d8cd98f00b204e9800998ecf8427e',
-            '100, 100', 'e40d8f23-2f59-49b7-bb78-bf9fecc1beeb', 2, 'b2b0c9ad-1292-43cd-aeed-6b492e67252d.bam')
+            '100, 100', 'GRCh37/hg19', 'e40d8f23-2f59-49b7-bb78-bf9fecc1beeb', SECRET, 2, 'b2b0c9ad-1292-43cd-aeed-6b492e67252d.bam')
 
         result = xmltodict.parse(etree.tostring(format_submission_xml(xml_library)))
 
@@ -240,10 +243,15 @@ class TestXMLUtils(TestCase):
         submission_actions = submission['SUBMISSION']['ACTIONS']
 
         self.assertEqual(len(result_actions), len(submission_actions))
-        self.assertEqual(result_actions['ACTION'][0]['@source'], submission_actions['ACTION'][0]['@source'])
-        self.assertEqual(result_actions['ACTION'][0]['@schema'], submission_actions['ACTION'][0]['@schema'])
-        self.assertEqual(result_actions['ACTION'][1]['@source'], submission_actions['ACTION'][1]['@source'])
-        self.assertEqual(result_actions['ACTION'][1]['@schema'], submission_actions['ACTION'][1]['@schema'])
+
+        self.assertEqual(
+            result_actions['ACTION'][0]['ADD']['@source'], submission_actions['ACTION'][0]['ADD']['@source'])
+        self.assertEqual(
+            result_actions['ACTION'][0]['ADD']['@schema'], submission_actions['ACTION'][0]['ADD']['@schema'])
+        self.assertEqual(
+            result_actions['ACTION'][1]['ADD']['@source'], submission_actions['ACTION'][1]['ADD']['@source'])
+        self.assertEqual(
+            result_actions['ACTION'][1]['ADD']['@schema'], submission_actions['ACTION'][1]['ADD']['@schema'])
 
     def test_get_title_prefix_exome(self):
         """
