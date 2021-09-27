@@ -21,6 +21,12 @@ DESIGN_DESC = {
     4: 'RNA-Seq consists of isolating RNA, converting it to complementary DNA (cDNA), enriching for polyadenylated transcripts or ribo-depletion to remove ribosomal RNAs, preparing the sequencing library and sequencing on an NGS platform.'
 }
 
+SEQUENCING_SOURCE = {
+    2: 'GENOMIC',
+    3: 'GENOMIC',
+    4: 'TRANSCRIPTOMIC'
+}
+
 SEQUENCING_TYPE = {
     2: 'WXS',
     3: 'WGS',
@@ -39,8 +45,8 @@ XML_CONTACTS = [
 
 
 def create_xml_library(
-        dna_source, fileservice_uuid, instrument_model, md5_checksum, read_lengths, sample_id, sequence_type,
-        upload_file_name):
+        dna_source, fileservice_uuid, instrument_model, md5_checksum, read_lengths, reference_genome, sample_id, secret,
+        sequence_type, upload_file_name):
     """
     Create the library object used for creating the XML files
     """
@@ -53,13 +59,14 @@ def create_xml_library(
         library['instrument_model'] = instrument_model
         library['library_layout'] = 'PAIRED'
         library['md5_checksum'] = md5_checksum
-        library['phs_accession'] = 'phs001232'
+        library['phs_accession'] = secret['accession']
+        library['phs_accession_version'] = secret['accession_version']
         library['platform'] = 'ILLUMINA'
         library['read_lengths'] = make_read_length_list(read_lengths)
-        library['reference'] = 'GRCh37/hg19'
+        library['reference'] = reference_genome
         library['sample_id'] = sample_id
         library['selection'] = 'RANDOM'
-        library['source'] = 'GENOMIC'
+        library['source'] = SEQUENCING_SOURCE[sequence_type]
         library['strategy'] = SEQUENCING_TYPE[sequence_type]
         library['title'] = get_title_prefix(sequence_type, dna_source) + sample_id
         library['upload_file_name'] = upload_file_name
@@ -268,14 +275,14 @@ def format_submission_xml(library):
     Converts a library into a "submission" ElementTree object
     """
     try:
-        xml_submission = etree.Element("SUBMISSION")
-        xml_submission.set('alias', library['phs_accession'] + '.v2')
+        alias = '{}.{}'.format(library['phs_accession'], library['phs_accession_version'])
+        namespace_map = {'xsi': 'http://www.w3.org/2001/XMLSchema-instance'}
+        qname = etree.QName('http://www.w3.org/2001/XMLSchema-instance', 'noNamespaceSchemaLocation')
+
+        xml_submission = etree.Element(
+            "SUBMISSION", {qname: 'http://www.ncbi.nlm.nih.gov/viewvc/v1/trunk/sra/doc/SRA/SRA.submission.xsd?view=co'}, nsmap=namespace_map)
+        xml_submission.set('alias', alias)
         xml_submission.set('center_name', library['center'])
-        xml_submission.set(
-            'xmlns:xsi', 'http://www.w3.org/2001/XMLSchema-instance')
-        xml_submission.set(
-            'xsi:noNamespaceSchemaLocation',
-            'http://www.ncbi.nlm.nih.gov/viewvc/v1/trunk/sra/doc/SRA/SRA.submission.xsd?view=co')
 
         xml_contacts = etree.SubElement(xml_submission, "CONTACTS")
 
@@ -300,7 +307,7 @@ def format_submission_xml(library):
         raise Exception(error_message)
 
 
-def create_and_tar_xml(dna_source, fileservice_uuid, instrument_model, md5_checksum, read_lengths, sample_id, sequence_type, upload_file_name, logger):
+def create_and_tar_xml(dna_source, fileservice_uuid, instrument_model, md5_checksum, read_lengths, reference_genome, sample_id, secret, sequence_type, upload_file_name, logger):
     """
     Creates the XML files for the BAM file and
     """
@@ -312,8 +319,8 @@ def create_and_tar_xml(dna_source, fileservice_uuid, instrument_model, md5_check
 
     try:
         library = create_xml_library(
-            dna_source, fileservice_uuid, instrument_model, md5_checksum, read_lengths, sample_id,
-            sequence_type, upload_file_name)
+            dna_source, fileservice_uuid, instrument_model, md5_checksum, read_lengths, reference_genome, sample_id,
+            secret, sequence_type, upload_file_name)
 
         experiment_xml = xml_to_string(format_experiment_xml(library))
         run_xml = xml_to_string(format_run_xml(library))

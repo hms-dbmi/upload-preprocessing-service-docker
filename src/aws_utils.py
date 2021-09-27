@@ -29,7 +29,7 @@ def get_s3_client():
     return boto3.resource('s3')
 
 
-def get_secret_from_secretes_manager(secret_id):
+def get_secret_from_secrets_manager(secret_id):
     """
     Returns the secret string from Secrets Manager
 
@@ -60,13 +60,13 @@ def write_aspera_secrets_to_disk():
     """
     Fetches Aspera secrets from Secrets Manager and writes them to disk
     """
-    aspera_key_secret = get_secret_from_secretes_manager('ups-prod-aspera-key')
+    aspera_key_secret = get_secret_from_secrets_manager('ups-prod-aspera-key')
     aspera_file = open("/aspera/aspera.pk", "wb")
     aspera_file.write(aspera_key_secret)
     aspera_file.flush()
     aspera_file.close()
 
-    aspera_vcf_key_secret = get_secret_from_secretes_manager('ups-prod-aspera-vcf-key')
+    aspera_vcf_key_secret = get_secret_from_secrets_manager('ups-prod-aspera-vcf-key')
     aspera_vcf_file = open("/aspera/aspera_vcf.pk", "wb")
     aspera_vcf_file.write(aspera_vcf_key_secret)
     aspera_vcf_file.flush()
