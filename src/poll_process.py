@@ -1,8 +1,11 @@
+"""
+Main workflow for sending files to dbGaP
+"""
 import os
 import sys
-import botocore
 import time
 from subprocess import check_output
+import botocore
 
 from aws_utils import get_queue_by_name, get_s3_client, get_secret_from_secrets_manager, write_aspera_secrets_to_disk
 from bams import process_bam
@@ -52,7 +55,7 @@ while True:
         upload_vcf_archive(ASPERA_VCF_LOCATION_CODE, TESTING, TESTING_BUCKET, TESTING_FOLDER)
     else:
         for message in messages:
-            continue_and_delete = True
+            CONTINUE_AND_DELETE = True
 
             if message.message_attributes is not None:
                 dna_data = message.message_attributes.get('dna_data').get('StringValue')
@@ -69,43 +72,44 @@ while True:
                 (dna_source, reference_genome) = dna_data.split('|')
 
                 if file_type == 'BAM':
-                    filename_extension = '.bam'
+                    FILENAME_EXTENSION = '.bam'
                 elif file_type == 'VCF':
-                    filename_extension = '.vcf'
+                    FILENAME_EXTENSION = '.vcf'
 
                 file_url_pieces = file_url.split('/')
                 file_bucket = file_url_pieces[2]
-                file_key = '/'.join(file_url_pieces[3:])
+                FILE_KEY = '/'.join(file_url_pieces[3:])
 
-                upload_file_name = "%s%s" % (fileservice_uuid, filename_extension)
+                upload_file_name = "%s%s" % (fileservice_uuid, FILENAME_EXTENSION)
 
-                if (dna_source and exportfile_id and file_type and file_url and fileservice_uuid and instrument_model and
-                        read_lengths and reference_genome and sample_id and sequence_type and udn_id and file_bucket and
-                        file_key and upload_file_name):
+                if (dna_source and exportfile_id and file_type and file_url and fileservice_uuid and
+                    instrument_model and read_lengths and reference_genome and sample_id and sequence_type and
+                        udn_id and file_bucket and FILE_KEY and upload_file_name):
                     write_to_logs(
-                        "Step 1 - File Retrieval: Processing file {} for participant {}".format(upload_file_name, udn_id), LOGGER)
-                    write_to_logs("Step 1 - File Retrieval: Downloading file {} from bucket {}".format(file_key, file_bucket))
+                        "Step 1 - File Retrieval: Processing file {} for participant {}".format(
+                            upload_file_name, udn_id), LOGGER)
+                    write_to_logs(
+                        "Step 1 - File Retrieval: Downloading file {} from bucket {}".format(FILE_KEY, file_bucket))
 
                     try:
-                        temp_file = "/scratch/md5"
+                        TEMP_FILE = "/scratch/md5"
                         retrieveBucket = S3_CLIENT.Bucket(file_bucket)
-                        retrieveBucket.download_file(file_key, temp_file)
+                        retrieveBucket.download_file(FILE_KEY, TEMP_FILE)
                     except botocore.exceptions.ClientError as exc:
-                        silent_remove(temp_file)
+                        silent_remove(TEMP_FILE)
                         write_to_logs(
                             "[ERROR] Step 1 - File Retrieval: Error retrieving file from S3: {}".format(exc), LOGGER)
-                        continue_and_delete = False
+                        CONTINUE_AND_DELETE = False
                         message.change_visibility(VisibilityTimeout=0)
                         continue
 
-                    if file_type == "BAM" and continue_and_delete:
+                    if file_type == "BAM" and CONTINUE_AND_DELETE:
                         try:
-                            md5_checksum = process_bam(
-                                udn_id, file_bucket, file_key, sample_id, upload_file_name, file_type, temp_file, LOGGER)
+                            MD5_CHECKSUM = process_bam(sample_id, upload_file_name, TEMP_FILE, LOGGER)
 
                             tar_file_name = create_and_tar_xml(
-                                dna_source, fileservice_uuid, instrument_model, md5_checksum, read_lengths, reference_genome, sample_id,
-                                SECRET, sequence_type, upload_file_name, LOGGER)
+                                dna_source, fileservice_uuid, instrument_model, MD5_CHECKSUM, read_lengths,
+                                reference_genome, sample_id, SECRET, sequence_type, upload_file_name, LOGGER)
 
                             if TESTING:
                                 bam_file_path = os.path.join(TESTING_FOLDER, upload_file_name)
@@ -120,60 +124,64 @@ while True:
                                     os.path.join("/scratch", tar_file_name), TESTING_BUCKET, tar_file_name)
                             else:
                                 try:
-                                    write_to_logs("Step 3 - File Upload: Attempting to upload file {} via Aspera - asp-hms-cc@gap-submit.ncbi.nlm.nih.gov:{}".format(
-                                        upload_file_name, ASPERA_LOCATION_CODE))
-                                    upload_output = check_output(["/home/aspera/.aspera/connect/bin/ascp -i /aspera/aspera.pk -Q -l 5000m -k 1 /scratch/" +
-                                                                  upload_file_name + " asp-hms-cc@gap-submit.ncbi.nlm.nih.gov:" + ASPERA_LOCATION_CODE], shell=True)
+                                    write_to_logs(
+                                        "Step 3 - File Upload: Attempting to upload file {} via Aspera - asp-hms-cc@gap-submit.ncbi.nlm.nih.gov:{}".format(
+                                            upload_file_name, ASPERA_LOCATION_CODE))
+                                    upload_output = check_output(
+                                        ["/home/aspera/.aspera/connect/bin/ascp -i /aspera/aspera.pk -Q -l 5000m -k 1 /scratch/" +
+                                         upload_file_name + " asp-hms-cc@gap-submit.ncbi.nlm.nih.gov:" + ASPERA_LOCATION_CODE], shell=True)
                                     write_to_logs("Step 3 - File Upload: Aspera returned {}", format(upload_output))
 
-                                    write_to_logs("Step 3 - File Upload: Attempting to upload file {} via Aspera - asp-hms-cc@gap-submit.ncbi.nlm.nih.gov:{}".format(
-                                        tar_file_name, ASPERA_LOCATION_CODE))
-                                    upload_output = check_output(["/home/aspera/.aspera/connect/bin/ascp -i /aspera/aspera.pk -Q -l 5000m -k 1 " +
-                                                                  tar_file_name + " asp-hms-cc@gap-submit.ncbi.nlm.nih.gov:" + ASPERA_LOCATION_CODE], shell=True)
+                                    write_to_logs(
+                                        "Step 3 - File Upload: Attempting to upload file {} via Aspera - asp-hms-cc@gap-submit.ncbi.nlm.nih.gov:{}".format(
+                                            tar_file_name, ASPERA_LOCATION_CODE))
+                                    upload_output = check_output(
+                                        ["/home/aspera/.aspera/connect/bin/ascp -i /aspera/aspera.pk -Q -l 5000m -k 1 " +
+                                         tar_file_name + " asp-hms-cc@gap-submit.ncbi.nlm.nih.gov:" + ASPERA_LOCATION_CODE], shell=True)
                                     write_to_logs("Step 3 - File Upload: Aspera returned {}", format(upload_output))
-                                except:
+                                except Exception:
                                     write_to_logs(
                                         "[ERROR] Step 3 - File Upload: Error sending files via Aspera {}".format(sys.exc_info()[:2]), LOGGER)
                                     message.change_visibility(VisibilityTimeout=0)
-                                    return_continue_and_delete = False
-                        except:
+                                    CONTINUE_AND_DELETE = False
+                        except Exception:
                             write_to_logs("[ERROR] Processing BAM {}".format(sys.exc_info()[:2]), LOGGER)
-                            continue_and_delete = False
+                            CONTINUE_AND_DELETE = False
                             message.change_visibility(VisibilityTimeout=0)
                             continue
                         finally:
                             silent_remove("/scratch/md5")
                             silent_remove("/scratch/header.sam")
                             silent_remove(tar_file_name)
-                    elif file_type == "VCF" and continue_and_delete:
+                    elif file_type == "VCF" and CONTINUE_AND_DELETE:
                         try:
-                            continue_and_delete = process_vcf(sample_id, upload_file_name, temp_file, LOGGER)
+                            CONTINUE_AND_DELETE = process_vcf(sample_id, upload_file_name, TEMP_FILE, LOGGER)
 
                             try:
-                                archive_size = os.path.getsize('/scratch/vcf_archive.tar')
+                                ARCHIVE_SIZE = os.path.getsize('/scratch/vcf_archive.tar')
                                 write_to_logs(
-                                    "Step 3 - File Upload: Current archive size: {}".format(archive_size))
+                                    "Step 3 - File Upload: Current archive size: {}".format(ARCHIVE_SIZE))
                             except OSError:
-                                archive_size = 0
+                                ARCHIVE_SIZE = 0
                                 write_to_logs(
-                                    "Step 3 - File Upload: Current archive size: {}".format(archive_size))
+                                    "Step 3 - File Upload: Current archive size: {}".format(ARCHIVE_SIZE))
 
-                            if archive_size > 250*1024**3:  # 250GB
+                            if ARCHIVE_SIZE > 250*1024**3:  # 250GB
                                 write_to_logs("Step 3 - File Upload:")
                                 upload_vcf_archive(ASPERA_VCF_LOCATION_CODE, TESTING, TESTING_BUCKET, TESTING_FOLDER)
-                        except:
+                        except Exception:
                             write_to_logs("[ERROR] Processing VCF - {}".format(sys.exc_info()[:2]), LOGGER)
-                            continue_and_delete = False
+                            CONTINUE_AND_DELETE = False
                             message.change_visibility(VisibilityTimeout=0)
                             continue
                         finally:
                             silent_remove("/scratch/md5")
                             silent_remove("/scratch/header.sam")
 
-                    silent_remove(temp_file)
+                    silent_remove(TEMP_FILE)
                     silent_remove("/scratch/" + upload_file_name)
 
-                    if continue_and_delete:
+                    if CONTINUE_AND_DELETE:
                         call_udngateway_mark_complete(exportfile_id, SECRET, LOGGER)
                         message.delete()
                     else:
@@ -181,7 +189,8 @@ while True:
 
                 else:
                     write_to_logs(
-                        "[ERROR] Step 1 - File Retrieval: Message failed to provide all required attributes {}".format(message))
+                        "[ERROR] Step 1 - File Retrieval: Message failed to provide all required attributes {}".format(
+                            message))
                     message.change_visibility(VisibilityTimeout=0)
                     continue
 

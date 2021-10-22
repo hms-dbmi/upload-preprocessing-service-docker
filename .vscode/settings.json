@@ -2,6 +2,9 @@
     "python.linting.enabled": true,
     "python.linting.pylintEnabled": true,
     "python.linting.pylintPath": "${workspaceRoot}/venv/bin/pylint",
+    "python.linting.pylintArgs": [
+        "--max-line-length=120"
+    ],
     "python.linting.lintOnSave": true,
     "python.formatting.autopep8Path": "${workspaceRoot}/venv/bin/autopep8",
     "python.envFile": "${workspaceRoot}/.env",

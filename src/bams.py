@@ -2,13 +2,15 @@
 Utilities for processing BAM files
 """
 import hashlib
-from logging import error
 import os
 from subprocess import call, check_output, CalledProcessError
 from utilities import write_to_logs
 
 
-def process_bam(udn_id, file_bucket, file_key, sample_id, upload_file_name, file_type, temp_file, logger):
+def process_bam(sample_id, upload_file_name, temp_file, logger):
+    """
+    Process the BAM - clean up headers and MD5
+    """
     bam_headers = list()
     write_to_logs("Step 2 - Processing File: Running samtools on BAM")
 
@@ -18,7 +20,7 @@ def process_bam(udn_id, file_bucket, file_key, sample_id, upload_file_name, file
         error_message = "[ERROR] Step 2 - Processing File: Unable to retrieve headers from BAM file {} with error {}".format(
             upload_file_name, exc)
         write_to_logs(error_message, logger)
-        raise Exception(error_message)
+        raise Exception(error_message) from exc
 
     output_headers = list()
     for header in bam_headers:
@@ -37,17 +39,17 @@ def process_bam(udn_id, file_bucket, file_key, sample_id, upload_file_name, file
         else:
             output_headers.append(header)
 
-    with open('/scratch/new_headers.sam', 'w') as f:
-        f.write('\n'.join(output_headers))
+    with open('/scratch/new_headers.sam', 'w') as new_headers:
+        new_headers.write('\n'.join(output_headers))
 
-    with open('/scratch/md5_reheader', 'wb') as f:
+    with open('/scratch/md5_reheader', 'wb') as reheader:
         try:
-            call(['samtools', 'reheader', '-P', '/scratch/new_headers.sam', temp_file], stdout=f)
+            call(['samtools', 'reheader', '-P', '/scratch/new_headers.sam', temp_file], stdout=reheader)
         except CalledProcessError as exc:
             error_message = "[ERROR] Step 2 - Processing File: Unable to run samtools reheader command on BAM file {} with error {}".format(
                 upload_file_name, exc)
             write_to_logs(error_message, logger)
-            raise Exception(error_message)
+            raise Exception(error_message) from exc
 
     os.rename('/scratch/md5_reheader', os.path.join('/scratch', upload_file_name))
 
@@ -63,12 +65,11 @@ def process_bam(udn_id, file_bucket, file_key, sample_id, upload_file_name, file
         write_to_logs(error_message, logger)
         raise Exception(error_message)
 
-    # bams are usually very big so stream instead of reading it all into memory
     md5_hash = hashlib.md5()
 
-    with open('/scratch/' + upload_file_name, 'rb') as f:
+    with open('/scratch/' + upload_file_name, 'rb') as upload_file:
         while True:
-            buf = f.read(2**20)
+            buf = upload_file.read(2**20)
 
             if not buf:
                 break

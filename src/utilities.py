@@ -30,10 +30,13 @@ def setup_logger(name):
 
 
 def silent_remove(filename):
+    """
+    Removes file if it exists
+    """
     try:
         os.remove(filename)
-    except OSError as e:
-        if e.errno != errno.ENOENT:
+    except OSError as exc:
+        if exc.errno != errno.ENOENT:
             raise
 
 
