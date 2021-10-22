@@ -3,14 +3,14 @@ Utilities for processing VCF files
 """
 import gzip
 import os
-import pysam
 import re
 import sys
-import tarfile
 import uuid
 from subprocess import check_output
-from aws_utils import get_s3_client
-from utilities import write_to_logs
+import pysam
+from src.archive import tar_and_remove_files
+from src.aws_utils import get_s3_client
+from src.utilities import write_to_logs
 
 # only these INFO annotations will be retained
 WHITELISTED_ANNOTATIONS = {
@@ -103,7 +103,8 @@ def process_vcf(sample_id, upload_file_name, temp_file, logger):
 
     try:
         write_to_logs(
-            "Step 2 - Processing File: Replacing sample_id and removing extra info for VCF file {}".format(upload_file_name))
+            "Step 2 - Processing File: Replacing sample_id and removing extra info for VCF file {}".format(
+                upload_file_name))
         trim_vcf('/scratch/{}.bak'.format(upload_file_name), '/scratch/{}'.format(upload_file_name), sample_id)
     except Exception as exc:
         write_to_logs("[ERROR] Step 2 - Processing File: Failed to trim annotations for VCF file {} with error {}".format(
@@ -115,11 +116,8 @@ def process_vcf(sample_id, upload_file_name, temp_file, logger):
     write_to_logs("Step 2 - Processing File: Compressing and indexing VCF {}".format(upload_file_name))
     pysam.tabix_index('/scratch/{}'.format(upload_file_name), preset='vcf', force=True)
 
-    with tarfile.TarFile('/scratch/vcf_archive.tar', 'a') as archive:
-        print("Step 2 - Processing File: Adding {} to archive".format(upload_file_name))
-        for name in ('{}.gz'.format(upload_file_name), '{}.gz.tbi'.format(upload_file_name)):
-            archive.add('/scratch/{}'.format(name), arcname=name)
-            os.remove('/scratch/{}'.format(name))
+    files_to_tar = ['/scratch/{}.gz'.format(upload_file_name), '/scratch/{}.gz.tbi'.format(upload_file_name)]
+    tar_and_remove_files('vcf_archive', '/scratch', files_to_tar, logger)
 
     return True
 
@@ -145,8 +143,10 @@ def upload_vcf_archive(aspera_vcf_location_code, testing, testing_bucket, testin
             write_to_logs("Step 3 - File Upload: Attempting to upload file {} via Aspera to {}".format(
                 upload_file_name, upload_location))
             upload_output = check_output(
-                ["/home/aspera/.aspera/connect/bin/ascp --file-crypt=encrypt -i /aspera/aspera_vcf.pk /scratch/" + upload_file_name + " " + upload_location], shell=True)
+                ["/home/aspera/.aspera/connect/bin/ascp --file-crypt=encrypt -i /aspera/aspera_vcf.pk /scratch/" +
+                 upload_file_name + " " + upload_location], shell=True)
             write_to_logs("Step 3 - File Upload: Aspera returned {}", format(upload_output))
-        except:
+        except Exception:
             write_to_logs(
-                "[ERROR] Step 3 - File Upload: Failed to send archive file via Aspera with error {}".format(sys.exc_info()[:2]))
+                "[ERROR] Step 3 - File Upload: Failed to send archive file via Aspera with error {}".format(
+                    sys.exc_info()[:2]))

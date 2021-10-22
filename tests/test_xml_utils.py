@@ -1,9 +1,9 @@
 """
 Tests for the XML Utils functions
 """
+from unittest import TestCase
 import xmltodict
 from lxml import etree
-from unittest import TestCase
 
 from src.xml_utils import (
     create_xml_library, format_experiment_xml, format_run_xml, format_submission_xml, get_title_prefix,
@@ -22,8 +22,9 @@ class TestXMLUtils(TestCase):
         Test that the XML library is created correctly
         """
         xml_library = create_xml_library(
-            'Blood', 'b2b0c9ad-1292-43cd-aeed-6b492e67252d', 'Illumina NovaSeq 5000', 'd41d8cd98f00b204e9800998ecf8427e',
-            '100, 100', 'GRCh37/hg19', 'e40d8f23-2f59-49b7-bb78-bf9fecc1beeb', SECRET, 2, 'b2b0c9ad-1292-43cd-aeed-6b492e67252d.bam')
+            'Blood', 'b2b0c9ad-1292-43cd-aeed-6b492e67252d', 'Illumina NovaSeq 5000',
+            'd41d8cd98f00b204e9800998ecf8427e', '100, 100', 'GRCh37/hg19', 'e40d8f23-2f59-49b7-bb78-bf9fecc1beeb',
+            SECRET, 2, 'b2b0c9ad-1292-43cd-aeed-6b492e67252d.bam')
 
         self.assertEqual(xml_library['attributes'], [['alignment_software', 'BWA v0.6.2']])
         self.assertEqual(xml_library['center'], 'HMS-CC')
@@ -42,7 +43,8 @@ class TestXMLUtils(TestCase):
         self.assertEqual(xml_library['source'], 'GENOMIC')
         self.assertEqual(xml_library['strategy'], 'WXS')
         self.assertEqual(
-            xml_library['title'], 'exome sequencing of homo sapiens: whole blood: Sample e40d8f23-2f59-49b7-bb78-bf9fecc1beeb')
+            xml_library['title'],
+            'exome sequencing of homo sapiens: whole blood: Sample e40d8f23-2f59-49b7-bb78-bf9fecc1beeb')
         self.assertEqual(xml_library['upload_file_name'], 'b2b0c9ad-1292-43cd-aeed-6b492e67252d.bam')
         self.assertEqual(xml_library['latf_load'], False)
 
@@ -50,12 +52,13 @@ class TestXMLUtils(TestCase):
         """
         Tests that the experiment XML is created correctly
         """
-        with open('./tests/mocks/experiment.xml') as fd:
-            experiment = xmltodict.parse(fd.read())
+        with open('./tests/mocks/experiment.xml') as experiment:
+            experiment = xmltodict.parse(experiment.read())
 
         xml_library = create_xml_library(
-            'Blood', 'b2b0c9ad-1292-43cd-aeed-6b492e67252d', 'Illumina NovaSeq 5000', 'd41d8cd98f00b204e9800998ecf8427e',
-            '100, 100', 'GRCh37/hg19', 'e40d8f23-2f59-49b7-bb78-bf9fecc1beeb', SECRET, 2, 'b2b0c9ad-1292-43cd-aeed-6b492e67252d.bam')
+            'Blood', 'b2b0c9ad-1292-43cd-aeed-6b492e67252d', 'Illumina NovaSeq 5000',
+            'd41d8cd98f00b204e9800998ecf8427e', '100, 100', 'GRCh37/hg19', 'e40d8f23-2f59-49b7-bb78-bf9fecc1beeb',
+            SECRET, 2, 'b2b0c9ad-1292-43cd-aeed-6b492e67252d.bam')
 
         result = xmltodict.parse(etree.tostring(format_experiment_xml(xml_library)))
 
@@ -94,11 +97,13 @@ class TestXMLUtils(TestCase):
         self.assertEqual(
             result_design_library_descriptor['LIBRARY_NAME'], experiment_design_library_descriptor['LIBRARY_NAME'])
         self.assertEqual(
-            result_design_library_descriptor['LIBRARY_STRATEGY'], experiment_design_library_descriptor['LIBRARY_STRATEGY'])
+            result_design_library_descriptor['LIBRARY_STRATEGY'],
+            experiment_design_library_descriptor['LIBRARY_STRATEGY'])
         self.assertEqual(
             result_design_library_descriptor['LIBRARY_SOURCE'], experiment_design_library_descriptor['LIBRARY_SOURCE'])
         self.assertEqual(
-            result_design_library_descriptor['LIBRARY_SELECTION'], experiment_design_library_descriptor['LIBRARY_SELECTION'])
+            result_design_library_descriptor['LIBRARY_SELECTION'],
+            experiment_design_library_descriptor['LIBRARY_SELECTION'])
         self.assertEqual(
             result_design_library_descriptor['LIBRARY_LAYOUT'], experiment_design_library_descriptor['LIBRARY_LAYOUT'])
 
@@ -147,7 +152,8 @@ class TestXMLUtils(TestCase):
 
         self.assertEqual(len(result_experiment_attributes), len(experiment_experiment_attributes))
         self.assertEqual(
-            len(result_experiment_attributes['EXPERIMENT_ATTRIBUTE']), len(experiment_experiment_attributes['EXPERIMENT_ATTRIBUTE']))
+            len(result_experiment_attributes['EXPERIMENT_ATTRIBUTE']),
+            len(experiment_experiment_attributes['EXPERIMENT_ATTRIBUTE']))
         self.assertEqual(
             result_experiment_attributes['EXPERIMENT_ATTRIBUTE']['TAG'],
             experiment_experiment_attributes['EXPERIMENT_ATTRIBUTE']['TAG'])
@@ -159,12 +165,13 @@ class TestXMLUtils(TestCase):
         """
         Tests that the run XML is created correctly
         """
-        with open('./tests/mocks/run.xml') as fd:
-            run = xmltodict.parse(fd.read())
+        with open('./tests/mocks/run.xml') as run:
+            run = xmltodict.parse(run.read())
 
         xml_library = create_xml_library(
-            'Blood', 'b2b0c9ad-1292-43cd-aeed-6b492e67252d', 'Illumina NovaSeq 5000', 'd41d8cd98f00b204e9800998ecf8427e',
-            '100, 100', 'GRCh37/hg19', 'e40d8f23-2f59-49b7-bb78-bf9fecc1beeb', SECRET, 2, 'b2b0c9ad-1292-43cd-aeed-6b492e67252d.bam')
+            'Blood', 'b2b0c9ad-1292-43cd-aeed-6b492e67252d', 'Illumina NovaSeq 5000',
+            'd41d8cd98f00b204e9800998ecf8427e', '100, 100', 'GRCh37/hg19', 'e40d8f23-2f59-49b7-bb78-bf9fecc1beeb',
+            SECRET, 2, 'b2b0c9ad-1292-43cd-aeed-6b492e67252d.bam')
 
         result = xmltodict.parse(etree.tostring(format_run_xml(xml_library)))
 
@@ -183,9 +190,11 @@ class TestXMLUtils(TestCase):
         run_experiment_ref_identifiers = run['RUN_SET']['RUN']['EXPERIMENT_REF']['IDENTIFIERS']
 
         self.assertEqual(
-            result_experiment_ref_identifiers['SUBMITTER_ID']['@namespace'], run_experiment_ref_identifiers['SUBMITTER_ID']['@namespace'])
+            result_experiment_ref_identifiers['SUBMITTER_ID']['@namespace'],
+            run_experiment_ref_identifiers['SUBMITTER_ID']['@namespace'])
         self.assertEqual(
-            result_experiment_ref_identifiers['SUBMITTER_ID']['#text'], run_experiment_ref_identifiers['SUBMITTER_ID']['#text'])
+            result_experiment_ref_identifiers['SUBMITTER_ID']['#text'],
+            run_experiment_ref_identifiers['SUBMITTER_ID']['#text'])
 
         result_data_block = result['RUN_SET']['RUN']['DATA_BLOCK']
         run_data_block = run['RUN_SET']['RUN']['DATA_BLOCK']
@@ -209,19 +218,21 @@ class TestXMLUtils(TestCase):
         """
         Tests that the submission XML is created correctly
         """
-        with open('./tests/mocks/submission.xml') as fd:
-            submission = xmltodict.parse(fd.read())
+        with open('./tests/mocks/submission.xml') as submission:
+            submission = xmltodict.parse(submission.read())
 
         xml_library = create_xml_library(
-            'Blood', 'b2b0c9ad-1292-43cd-aeed-6b492e67252d', 'Illumina NovaSeq 5000', 'd41d8cd98f00b204e9800998ecf8427e',
-            '100, 100', 'GRCh37/hg19', 'e40d8f23-2f59-49b7-bb78-bf9fecc1beeb', SECRET, 2, 'b2b0c9ad-1292-43cd-aeed-6b492e67252d.bam')
+            'Blood', 'b2b0c9ad-1292-43cd-aeed-6b492e67252d', 'Illumina NovaSeq 5000',
+            'd41d8cd98f00b204e9800998ecf8427e', '100, 100', 'GRCh37/hg19', 'e40d8f23-2f59-49b7-bb78-bf9fecc1beeb',
+            SECRET, 2, 'b2b0c9ad-1292-43cd-aeed-6b492e67252d.bam')
 
         result = xmltodict.parse(etree.tostring(format_submission_xml(xml_library)))
 
         self.assertEqual(result['SUBMISSION']['@alias'], submission['SUBMISSION']['@alias'])
         self.assertEqual(result['SUBMISSION']['@center_name'], submission['SUBMISSION']['@center_name'])
         self.assertEqual(
-            result['SUBMISSION']['@xsi:noNamespaceSchemaLocation'], submission['SUBMISSION']['@xsi:noNamespaceSchemaLocation'])
+            result['SUBMISSION']['@xsi:noNamespaceSchemaLocation'],
+            submission['SUBMISSION']['@xsi:noNamespaceSchemaLocation'])
         self.assertEqual(result['SUBMISSION']['@xmlns:xsi'], submission['SUBMISSION']['@xmlns:xsi'])
 
         result_contacts = result['SUBMISSION']['CONTACTS']
