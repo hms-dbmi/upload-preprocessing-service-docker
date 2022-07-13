@@ -5,7 +5,7 @@ from os.path import exists
 import tarfile
 from unittest import TestCase
 from unittest.mock import patch
-from src.archive import tar_and_remove_files
+from src.archives import tar_and_remove_files
 from src.utilities import silent_remove
 
 

@@ -24,17 +24,14 @@ ENV PATH /samtools.tar.bz2/samtools-1.3.1/:$PATH
 
 ENV AWS_CONFIG_FILE /.aws/config
 
-RUN mkdir /output/
+RUN mkdir /src/
 
 RUN mkdir /.aws/
 COPY config /.aws/config
 
-COPY src/aws_utils.py /output/aws_utils.py
-COPY src/bams.py /output/bams.py
-COPY src/poll_process.py /output/poll_process.py
-COPY src/udn_gateway.py /output/udn_gateway.py
-COPY src/utilities.py /output/utilities.py
-COPY src/vcfs.py /output/vcfs.py
-COPY src/xml_utils.py /output/xml_utils.py
+COPY src/poll_process.py /src/poll_process.py
 
-CMD ["python3","/output/poll_process.py"]
+COPY src/helpers/__init__.py /src/helpers/__init__.py
+COPY src/helpers/utilities.py /src/helpers/utilities.py
+
+CMD ["python3","/src/poll_process.py"]
