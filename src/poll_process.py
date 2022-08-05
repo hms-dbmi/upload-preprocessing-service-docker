@@ -158,7 +158,7 @@ while True:
                                 upload_output = check_output(
                                     ["/home/aspera/.aspera/connect/bin/ascp -i /aspera/aspera.pk -Q -l 5000m -k 1 /scratch/" +
                                         upload_file_name + " asp-hms-cc@gap-submit.ncbi.nlm.nih.gov:" + ASPERA_LOCATION_CODE], shell=True)
-                                write_to_logs("Step 3 - File Upload: Aspera returned {}", format(upload_output))
+                                write_to_logs("Step 3 - File Upload: Aspera returned {}".format(upload_output))
 
                                 write_to_logs(
                                     "Step 3 - File Upload: Attempting to upload file {} via Aspera - asp-hms-cc@gap-submit.ncbi.nlm.nih.gov:{}".format(
@@ -166,7 +166,7 @@ while True:
                                 upload_output = check_output(
                                     ["/home/aspera/.aspera/connect/bin/ascp -i /aspera/aspera.pk -Q -l 5000m -k 1 " +
                                         tar_file_name + " asp-hms-cc@gap-submit.ncbi.nlm.nih.gov:" + ASPERA_LOCATION_CODE], shell=True)
-                                write_to_logs("Step 3 - File Upload: Aspera returned {}", format(upload_output))
+                                write_to_logs("Step 3 - File Upload: Aspera returned {}".format(upload_output))
                             except Exception:
                                 write_to_logs(
                                     "[ERROR] Step 3 - File Upload: Error sending files via Aspera {}".format(sys.exc_info()[:2]), LOGGER)
