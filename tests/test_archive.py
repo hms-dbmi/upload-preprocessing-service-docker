@@ -45,7 +45,29 @@ class TestArchive(TestCase):
         self.assertTrue(tarfile.is_tarfile('./test.tar'))
 
         with tarfile.open('./test.tar') as test_tar:
-            test_tar.extractall('./')
+            
+            import os
+            
+            def is_within_directory(directory, target):
+                
+                abs_directory = os.path.abspath(directory)
+                abs_target = os.path.abspath(target)
+            
+                prefix = os.path.commonprefix([abs_directory, abs_target])
+                
+                return prefix == abs_directory
+            
+            def safe_extract(tar, path=".", members=None, *, numeric_owner=False):
+            
+                for member in tar.getmembers():
+                    member_path = os.path.join(path, member.name)
+                    if not is_within_directory(path, member_path):
+                        raise Exception("Attempted Path Traversal in Tar File")
+            
+                tar.extractall(path, members, numeric_owner=numeric_owner) 
+                
+            
+            safe_extract(test_tar, "./")
 
         self.assertTrue(exists('./testfile1.txt'))
         self.assertTrue(exists('./testfile2.txt'))
