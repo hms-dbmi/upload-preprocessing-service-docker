@@ -74,9 +74,9 @@ def trim_vcf(from_file, to_file, new_id):
     Also replaces sample ID.
     """
     try:
-        f_input = open(from_file)
-    except UnicodeDecodeError:
         f_input = gzip.open(from_file, 'rt')
+    except:
+        f_input = open(from_file)
     finally:
         with open(to_file, 'w') as f_output:
             for line in f_input:

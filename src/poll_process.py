@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 """
 Main workflow for sending files to dbGaP
 """
@@ -15,13 +17,13 @@ from vcfs import process_vcf, upload_vcf_archive
 
 LOGGER = setup_logger('ups')
 
-SECRET = get_secret_from_secrets_manager("ups-prod")
+SECRET = get_secret_from_secrets_manager("ups-dev")
 write_aspera_secrets_to_disk()
 
 # If testing, do not upload files to dbGaP, but instead save the processed file to a special S3 bucket
 if SECRET['status'] == 'test':
     TESTING = True
-    TESTING_BUCKET = 'udn-files-test'
+    TESTING_BUCKET = 'gateway-participant-sequencing-files-' + SECRET['sequencing-bucket']
     TESTING_FOLDER = 'ups-testing'
 
     print("[DEBUG] TEST mode. All files uploaded to {}".format(TESTING_BUCKET), flush=True)
@@ -34,7 +36,7 @@ else:
     ASPERA_VCF_LOCATION_CODE = SECRET['aspera-location-code-vcf']
     os.environ["ASPERA_SCP_FILEPASS"] = ASPERA_PASS
 
-QUEUE_NAME = 'upload-preprocessing'
+QUEUE_NAME = 'ups'
 SQS_QUEUE = get_queue_by_name(QUEUE_NAME)
 
 S3_CLIENT = get_s3_client()
