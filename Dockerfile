@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y gcc make bzip2 zlib1g-dev ncurses-dev l
 RUN apt-get update && apt-get install -y python3
 RUN apt-get update && apt-get install -y python3-pip
 RUN apt-get update && apt-get install -y wget
+RUN apt-get update && apt-get install -y libxml2-utils
 
 RUN mkdir /aspera/
 RUN wget http://download.asperasoft.com/download/sw/connect/3.6.2/aspera-connect-3.6.2.117442-linux-64.tar.gz -P /aspera/
@@ -15,7 +16,7 @@ RUN useradd -m aspera
 RUN usermod -L aspera
 RUN runuser -l aspera -c '/aspera/aspera-connect-3.6.2.117442-linux-64.sh'
 
-RUN python3 -m pip install boto3 requests pysam
+RUN python3 -m pip install boto3 lxml requests pysam
 
 ADD samtools-1.3.1.tar.bz2 samtools.tar.bz2	
 RUN cd samtools.tar.bz2 && cd samtools-1.3.1 && make	
@@ -34,5 +35,6 @@ COPY src/poll_process.py /output/poll_process.py
 COPY src/udn_gateway.py /output/udn_gateway.py
 COPY src/utilities.py /output/utilities.py
 COPY src/vcfs.py /output/vcfs.py
+COPY src/xml_utils.py /output/xml_utils.py
 
 CMD ["python3","/output/poll_process.py"]
