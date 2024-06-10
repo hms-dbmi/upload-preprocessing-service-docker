@@ -14,6 +14,7 @@ from bams import process_bam
 from udn_gateway import call_udngateway_mark_complete
 from utilities import setup_logger, silent_remove, write_to_logs
 from vcfs import process_vcf, upload_vcf_archive
+from xml_utils import create_and_tar_xml
 
 LOGGER = setup_logger('ups')
 
@@ -108,6 +109,10 @@ while True:
                         try:
                             MD5_CHECKSUM = process_bam(sample_id, upload_file_name, TEMP_FILE, LOGGER)
 
+                            tar_file_name = create_and_tar_xml(
+                                dna_source, fileservice_uuid, instrument_model, MD5_CHECKSUM, read_lengths,
+                                reference_genome, sample_id, SECRET, sequence_type, upload_file_name, LOGGER)
+
                             if TESTING:
                                 bam_file_path = os.path.join(TESTING_FOLDER, upload_file_name)
 
@@ -116,6 +121,8 @@ while True:
                                 testing_s3 = get_s3_client()
                                 testing_s3.meta.client.upload_file(
                                     os.path.join("/scratch", upload_file_name), TESTING_BUCKET, bam_file_path)
+                                testing_s3.meta.client.upload_file(
+                                    os.path.join("/scratch", tar_file_name), TESTING_BUCKET, tar_file_name)
                             else:
                                 try:
                                     write_to_logs(
@@ -124,6 +131,14 @@ while True:
                                     upload_output = check_output(
                                         ["/home/aspera/.aspera/connect/bin/ascp -i /aspera/aspera.pk -Q -l 5000m -k 1 /scratch/" +
                                          upload_file_name + " asp-hms-cc@gap-submit.ncbi.nlm.nih.gov:" + ASPERA_LOCATION_CODE], shell=True)
+                                    write_to_logs("Step 3 - File Upload: Aspera returned {}", format(upload_output))
+
+                                    write_to_logs(
+                                        "Step 3 - File Upload: Attempting to upload file {} via Aspera - asp-hms-cc@gap-submit.ncbi.nlm.nih.gov:{}".format(
+                                            tar_file_name, ASPERA_LOCATION_CODE))
+                                    upload_output = check_output(
+                                        ["/home/aspera/.aspera/connect/bin/ascp -i /aspera/aspera.pk -Q -l 5000m -k 1 " +
+                                         tar_file_name + " asp-hms-cc@gap-submit.ncbi.nlm.nih.gov:" + ASPERA_LOCATION_CODE], shell=True)
                                     write_to_logs("Step 3 - File Upload: Aspera returned {}", format(upload_output))
 
                                 except Exception:
@@ -139,6 +154,7 @@ while True:
                         finally:
                             silent_remove("/scratch/md5")
                             silent_remove("/scratch/header.sam")
+                            silent_remove(tar_file_name)
                     elif file_type == "VCF" and CONTINUE_AND_DELETE:
                         try:
                             CONTINUE_AND_DELETE = process_vcf(sample_id, upload_file_name, TEMP_FILE, LOGGER)
