@@ -35,11 +35,11 @@ def process_header(line, new_ids=None):
         return None
 
     # non-whitelisted annotations
-    match = re.match(r'##INFO=<ID=([^,]+)', line)
-    if match:
-        info_name = match.group(1)
-        if info_name not in WHITELISTED_ANNOTATIONS:
-            return None
+   ## match = re.match(r'##INFO=<ID=([^,]+)', line)
+   ## if match:
+   ##     info_name = match.group(1)
+   ##     if info_name not in WHITELISTED_ANNOTATIONS:
+   ##         return None
 
     if line.startswith('#CHROM') and new_ids is not None:
         fields = line.strip().split('\t')[:9]  # fixed headers
@@ -82,8 +82,8 @@ def trim_vcf(from_file, to_file, new_id):
             for line in f_input:
                 if line.startswith('#'):
                     result = process_header(line, (new_id,))
-                else:
-                    result = process_body(line)
+                ## else:
+                ##     result = process_body(line)
 
                 if result is not None:
                     f_output.write(result)
