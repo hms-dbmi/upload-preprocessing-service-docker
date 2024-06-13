@@ -34,13 +34,6 @@ def process_header(line, new_ids=None):
     ):
         return None
 
-    ## # non-whitelisted annotations
-    ## match = re.match(r'##INFO=<ID=([^,]+)', line)
-    ## if match:
-    ##     info_name = match.group(1)
-    ##     if info_name not in WHITELISTED_ANNOTATIONS:
-    ##         return None
-
     if line.startswith('#CHROM') and new_ids is not None:
         fields = line.strip().split('\t')[:9]  # fixed headers
         fields.extend(new_ids)

@@ -343,24 +343,6 @@ def create_and_tar_xml(
         write_to_logs(error_message, logger)
         raise Exception(error_message) from exc
 
-    write_to_logs("Step 2 - Processing File: Validating XML for {}".format(upload_file_name))
-
-    exp_result = call(
-        'xmllint --schema http://www.ncbi.nlm.nih.gov/viewvc/v1/trunk/sra/doc/SRA/SRA.experiment.xsd?view=co /scratch/experiment.xml > /dev/null', shell=True)
-    run_result = call(
-        'xmllint --schema http://www.ncbi.nlm.nih.gov/viewvc/v1/trunk/sra/doc/SRA/SRA.run.xsd?view=co /scratch/run.xml > /dev/null', shell=True)
-    sub_result = call(
-        'xmllint --schema http://www.ncbi.nlm.nih.gov/viewvc/v1/trunk/sra/doc/SRA/SRA.submission.xsd?view=co /scratch/submission.xml > /dev/null', shell=True)
-
-    if exp_result == 0 and run_result == 0 and sub_result == 0:
-        print("Step 2 - Processing File: Successful validation of XML files for {}".format(
-            upload_file_name), flush=True)
-    else:
-        error_message = "[ERROR] Step 2 - Processing File: Failed validation of XML files for {} - exp_result ==> {}; run_result ==> {}; sub_result ==> {} ".format(
-            upload_file_name, exp_result, run_result, sub_result)
-        write_to_logs(error_message, logger)
-        raise Exception(error_message)
-
     xml_files_to_tar = ['/scratch/experiment.xml', '/scratch/run.xml', '/scratch/submission.xml']
     tar_file_name = tar_and_remove_files(upload_file_name, '/scratch', xml_files_to_tar, logger)
 
