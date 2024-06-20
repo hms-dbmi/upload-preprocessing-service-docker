@@ -34,13 +34,6 @@ def process_header(line, new_ids=None):
     ):
         return None
 
-    # non-whitelisted annotations
-    match = re.match(r'##INFO=<ID=([^,]+)', line)
-    if match:
-        info_name = match.group(1)
-        if info_name not in WHITELISTED_ANNOTATIONS:
-            return None
-
     if line.startswith('#CHROM') and new_ids is not None:
         fields = line.strip().split('\t')[:9]  # fixed headers
         fields.extend(new_ids)
@@ -49,23 +42,11 @@ def process_header(line, new_ids=None):
     return line
 
 
-def process_body(line):
-    """
-    Retains only whitelisted INFO annotations in each record.
-    """
-    fields = line.split('\t')  # preserves newline
-    infos = fields[7].split(';')
-
-    whitelisted = [
-        info for info in infos
-        if any(
-            info.startswith(x + '=') or info == x
-            for x in WHITELISTED_ANNOTATIONS
-        )
-    ]
-
-    fields[7] = ';'.join(whitelisted)
-    return '\t'.join(fields)
+def is_gzipped(file_path):
+    """Check if the file is gzipped by reading its magic number."""
+    with open(file_path, 'rb') as f:
+        magic_number = f.read(2)
+    return magic_number == b'\x1f\x8b'  
 
 
 def trim_vcf(from_file, to_file, new_id):
@@ -74,19 +55,23 @@ def trim_vcf(from_file, to_file, new_id):
     Also replaces sample ID.
     """
     try:
-        f_input = gzip.open(from_file, 'rt')
-    except:
-        f_input = open(from_file)
+        try:
+            if is_gzipped(from_file):
+                f_input = gzip.open(from_file, 'rt')
+            else:
+                f_input = open(from_file)
+        except IOError as e:
+            print(f"Error opening file {from_file}: {e}")
+            f_input = None  # Handle the case where the file cannot be opened
     finally:
         with open(to_file, 'w') as f_output:
             for line in f_input:
                 if line.startswith('#'):
                     result = process_header(line, (new_id,))
+                    if result is not None:
+                        f_output.write(result)
                 else:
-                    result = process_body(line)
-
-                if result is not None:
-                    f_output.write(result)
+                    f_output.write(line)
 
         if not f_input.closed:
             f_input.close()
