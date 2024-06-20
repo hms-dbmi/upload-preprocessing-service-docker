@@ -18,7 +18,7 @@ from xml_utils import create_and_tar_xml
 
 LOGGER = setup_logger('ups')
 
-SECRET = get_secret_from_secrets_manager("ups-dev")
+SECRET = get_secret_from_secrets_manager("ups-prod")
 write_aspera_secrets_to_disk()
 
 # If testing, do not upload files to dbGaP, but instead save the processed file to a special S3 bucket
