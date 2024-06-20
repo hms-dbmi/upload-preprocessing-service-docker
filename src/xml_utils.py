@@ -39,7 +39,7 @@ XML_ACTIONS = [
 
 XML_CONTACTS = [
     {'name': 'Cecilia Esteves', 'email': 'cecilia_esteves@hms.harvard.edu'},
-    {'name': 'John Carmichael', 'email': 'john_carmichael@hms.harvard.edu'},
+    {'name': 'Mark Mangoba', 'email': 'mark_mangoba-agustin@hms.harvard.edu'},
 ]
 
 
