@@ -129,16 +129,16 @@ while True:
                                         "Step 3 - File Upload: Attempting to upload file {} via Aspera - asp-hms-cc@gap-submit.ncbi.nlm.nih.gov:{}".format(
                                             upload_file_name, ASPERA_LOCATION_CODE))
                                     upload_output = check_output(
-                                        ["/home/aspera/.aspera/connect/bin/ascp -i /aspera/aspera.pk -Q -l 5000m -k 1 /scratch/" +
-                                         upload_file_name + " asp-hms-cc@gap-submit.ncbi.nlm.nih.gov:" + ASPERA_LOCATION_CODE], shell=True)
+                                        ["/home/aspera/.aspera/connect/bin/ascp -i /aspera/aspera-v2.pk -Q -l 5000m -k 1 /scratch/" +
+                                         upload_file_name + " asp-dbgap@gap-submit.ncbi.nlm.nih.gov:" + ASPERA_LOCATION_CODE],shell=True)
                                     write_to_logs("Step 3 - File Upload: Aspera returned {}", format(upload_output))
 
                                     write_to_logs(
-                                        "Step 3 - File Upload: Attempting to upload file {} via Aspera - asp-hms-cc@gap-submit.ncbi.nlm.nih.gov:{}".format(
+                                            "Step 3 - File Upload: Attempting to upload file {} via Aspera - asp-dbgap@gap-submit.ncbi.nlm.nih.gov:{}".format(
                                             tar_file_name, ASPERA_LOCATION_CODE))
                                     upload_output = check_output(
-                                        ["/home/aspera/.aspera/connect/bin/ascp -i /aspera/aspera.pk -Q -l 5000m -k 1 " +
-                                         tar_file_name + " asp-hms-cc@gap-submit.ncbi.nlm.nih.gov:" + ASPERA_LOCATION_CODE], shell=True)
+                                        ["/home/aspera/.aspera/connect/bin/ascp -i /aspera/aspera-v2.pk -Q -l 5000m -k 1 " +
+                                         tar_file_name + " asp-dbgap@gap-submit.ncbi.nlm.nih.gov:" + ASPERA_LOCATION_CODE], shell=True)
                                     write_to_logs("Step 3 - File Upload: Aspera returned {}", format(upload_output))
 
                                 except Exception:
